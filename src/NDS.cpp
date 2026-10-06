@@ -160,8 +160,17 @@ void DeInit()
 
 void SetupDirectBoot()
 {
+    // Keep direct boot compatible with streamed ROMs: the header is tiny and
+    // ARM9/ARM7 binaries are copied from the cartridge in 4 KiB chunks.
+    u8 header[0x170];
+    if (!NDSCart::ReadROMBytes(0, header, sizeof(header)))
+    {
+        printf("Direct boot: failed to read ROM header\n");
+        return;
+    }
+
     u32 bootparams[8];
-    memcpy(bootparams, &NDSCart::CartROM[0x20], 8*4);
+    memcpy(bootparams, &header[0x20], sizeof(bootparams));
 
     printf("ARM9: offset=%08X entry=%08X RAM=%08X size=%08X\n",
            bootparams[0], bootparams[1], bootparams[2], bootparams[3]);
@@ -170,35 +179,83 @@ void SetupDirectBoot()
 
     MapSharedWRAM(3);
 
-    for (u32 i = 0; i < bootparams[3]; i+=4)
+    static u8 loadbuf[0x1000];
+
+    u32 pos = 0;
+    while (pos < bootparams[3])
     {
-        u32 tmp = *(u32*)&NDSCart::CartROM[bootparams[0]+i];
-        ARM9Write32(bootparams[2]+i, tmp);
+        u32 chunk = bootparams[3] - pos;
+        if (chunk > sizeof(loadbuf))
+            chunk = sizeof(loadbuf);
+
+        if (!NDSCart::ReadROMBytes(bootparams[0] + pos, loadbuf, chunk))
+        {
+            printf("Direct boot: failed to stream ARM9 at %08X\n", bootparams[0] + pos);
+            return;
+        }
+
+        u32 i = 0;
+        for (; i + 4 <= chunk; i += 4)
+        {
+            u32 tmp;
+            memcpy(&tmp, &loadbuf[i], 4);
+            ARM9Write32(bootparams[2] + pos + i, tmp);
+        }
+        for (; i < chunk; i++)
+            ARM9Write8(bootparams[2] + pos + i, loadbuf[i]);
+
+        pos += chunk;
     }
 
-    for (u32 i = 0; i < bootparams[7]; i+=4)
+    pos = 0;
+    while (pos < bootparams[7])
     {
-        u32 tmp = *(u32*)&NDSCart::CartROM[bootparams[4]+i];
-        ARM7Write32(bootparams[6]+i, tmp);
+        u32 chunk = bootparams[7] - pos;
+        if (chunk > sizeof(loadbuf))
+            chunk = sizeof(loadbuf);
+
+        if (!NDSCart::ReadROMBytes(bootparams[4] + pos, loadbuf, chunk))
+        {
+            printf("Direct boot: failed to stream ARM7 at %08X\n", bootparams[4] + pos);
+            return;
+        }
+
+        u32 i = 0;
+        for (; i + 4 <= chunk; i += 4)
+        {
+            u32 tmp;
+            memcpy(&tmp, &loadbuf[i], 4);
+            ARM7Write32(bootparams[6] + pos + i, tmp);
+        }
+        for (; i < chunk; i++)
+            ARM7Write8(bootparams[6] + pos + i, loadbuf[i]);
+
+        pos += chunk;
     }
 
-    for (u32 i = 0; i < 0x170; i+=4)
+    for (u32 i = 0; i < 0x170; i += 4)
     {
-        u32 tmp = *(u32*)&NDSCart::CartROM[i];
+        u32 tmp;
+        memcpy(&tmp, &header[i], 4);
         ARM9Write32(0x027FFE00+i, tmp);
     }
 
+    u16 header15E;
+    u16 header6C;
+    memcpy(&header15E, &header[0x15E], 2);
+    memcpy(&header6C, &header[0x6C], 2);
+
     ARM9Write32(0x027FF800, NDSCart::CartID);
     ARM9Write32(0x027FF804, NDSCart::CartID);
-    ARM9Write16(0x027FF808, *(u16*)&NDSCart::CartROM[0x15E]);
-    ARM9Write16(0x027FF80A, *(u16*)&NDSCart::CartROM[0x6C]);
+    ARM9Write16(0x027FF808, header15E);
+    ARM9Write16(0x027FF80A, header6C);
 
     ARM9Write16(0x027FF850, 0x5835);
 
     ARM9Write32(0x027FFC00, NDSCart::CartID);
     ARM9Write32(0x027FFC04, NDSCart::CartID);
-    ARM9Write16(0x027FFC08, *(u16*)&NDSCart::CartROM[0x15E]);
-    ARM9Write16(0x027FFC0A, *(u16*)&NDSCart::CartROM[0x6C]);
+    ARM9Write16(0x027FFC08, header15E);
+    ARM9Write16(0x027FFC0A, header6C);
 
     ARM9Write16(0x027FFC10, 0x5835);
     ARM9Write16(0x027FFC30, 0xFFFF);
