@@ -65,141 +65,6 @@ void Write_Flash(u8 val, bool islast);
 void Write_Discover(u8 val, bool islast);
 
 
-static void InvalidateROMCache()
-{
-    memset(CartCache, 0, sizeof(CartCache));
-    CartCacheClock = 0;
-}
-
-static void CloseROMBacking()
-{
-    if (CartROMFile)
-    {
-        fclose(CartROMFile);
-        CartROMFile = NULL;
-    }
-
-    CartROMFileSize = 0;
-    InvalidateROMCache();
-}
-
-static CartCachePage* GetROMCachePage(u32 base)
-{
-    if (!CartROMFile) return NULL;
-
-    CartCacheClock++;
-    if (CartCacheClock == 0)
-    {
-        CartCacheClock = 1;
-        for (u32 i = 0; i < CartCachePageCount; i++)
-            CartCache[i].Age = 0;
-    }
-
-    for (u32 i = 0; i < CartCachePageCount; i++)
-    {
-        if (CartCache[i].Valid && CartCache[i].Base == base)
-        {
-            CartCache[i].Age = CartCacheClock;
-            return &CartCache[i];
-        }
-    }
-
-    u32 victim = 0;
-    u32 oldest = 0xFFFFFFFF;
-    for (u32 i = 0; i < CartCachePageCount; i++)
-    {
-        if (!CartCache[i].Valid)
-        {
-            victim = i;
-            break;
-        }
-
-        if (CartCache[i].Age < oldest)
-        {
-            oldest = CartCache[i].Age;
-            victim = i;
-        }
-    }
-
-    CartCachePage* page = &CartCache[victim];
-    page->Valid = false;
-    memset(page->Data, 0, CartCachePageSize);
-
-    if (base < CartROMFileSize)
-    {
-        u32 readlen = CartROMFileSize - base;
-        if (readlen > CartCachePageSize)
-            readlen = CartCachePageSize;
-
-        if (fseek(CartROMFile, (long)base, SEEK_SET) != 0)
-        {
-            printf("ROM cache: seek failed at %08X\n", base);
-            return NULL;
-        }
-
-        size_t got = fread(page->Data, 1, readlen, CartROMFile);
-        if (got != readlen)
-        {
-            printf("ROM cache: short read at %08X (%d/%d)\n",
-                   base, (int)got, (int)readlen);
-            return NULL;
-        }
-    }
-
-    page->Base = base;
-    page->Age = CartCacheClock;
-    page->Valid = true;
-    return page;
-}
-
-bool ReadROMBytes(u32 addr, void* dst_, u32 len)
-{
-    u8* dst = (u8*)dst_;
-    if (!dst || !CartROM || !CartROMFile)
-        return false;
-
-    while (len)
-    {
-        if (addr >= CartROMSize)
-            return false;
-
-        u32 logicalremain = CartROMSize - addr;
-        u32 chunk = len;
-        if (chunk > logicalremain)
-            chunk = logicalremain;
-
-        if (addr < CartROMResidentSize)
-        {
-            u32 residentremain = CartROMResidentSize - addr;
-            if (chunk > residentremain)
-                chunk = residentremain;
-
-            memcpy(dst, CartROM + addr, chunk);
-        }
-        else
-        {
-            u32 base = addr & ~(CartCachePageSize - 1);
-            CartCachePage* page = GetROMCachePage(base);
-            if (!page)
-                return false;
-
-            u32 inpage = addr - base;
-            u32 pageremain = CartCachePageSize - inpage;
-            if (chunk > pageremain)
-                chunk = pageremain;
-
-            memcpy(dst, page->Data + inpage, chunk);
-        }
-
-        dst += chunk;
-        addr += chunk;
-        len -= chunk;
-    }
-
-    return true;
-}
-
-
 bool Init()
 {
     SRAM = NULL;
@@ -1000,6 +865,141 @@ void Key2_Encrypt(u8* data, u32 len)
         Key2_X &= 0x0000007FFFFFFFFFULL;
         Key2_Y &= 0x0000007FFFFFFFFFULL;
     }
+}
+
+
+static void InvalidateROMCache()
+{
+    memset(CartCache, 0, sizeof(CartCache));
+    CartCacheClock = 0;
+}
+
+static void CloseROMBacking()
+{
+    if (CartROMFile)
+    {
+        fclose(CartROMFile);
+        CartROMFile = NULL;
+    }
+
+    CartROMFileSize = 0;
+    InvalidateROMCache();
+}
+
+static CartCachePage* GetROMCachePage(u32 base)
+{
+    if (!CartROMFile) return NULL;
+
+    CartCacheClock++;
+    if (CartCacheClock == 0)
+    {
+        CartCacheClock = 1;
+        for (u32 i = 0; i < CartCachePageCount; i++)
+            CartCache[i].Age = 0;
+    }
+
+    for (u32 i = 0; i < CartCachePageCount; i++)
+    {
+        if (CartCache[i].Valid && CartCache[i].Base == base)
+        {
+            CartCache[i].Age = CartCacheClock;
+            return &CartCache[i];
+        }
+    }
+
+    u32 victim = 0;
+    u32 oldest = 0xFFFFFFFF;
+    for (u32 i = 0; i < CartCachePageCount; i++)
+    {
+        if (!CartCache[i].Valid)
+        {
+            victim = i;
+            break;
+        }
+
+        if (CartCache[i].Age < oldest)
+        {
+            oldest = CartCache[i].Age;
+            victim = i;
+        }
+    }
+
+    CartCachePage* page = &CartCache[victim];
+    page->Valid = false;
+    memset(page->Data, 0, CartCachePageSize);
+
+    if (base < CartROMFileSize)
+    {
+        u32 readlen = CartROMFileSize - base;
+        if (readlen > CartCachePageSize)
+            readlen = CartCachePageSize;
+
+        if (fseek(CartROMFile, (long)base, SEEK_SET) != 0)
+        {
+            printf("ROM cache: seek failed at %08X\n", base);
+            return NULL;
+        }
+
+        size_t got = fread(page->Data, 1, readlen, CartROMFile);
+        if (got != readlen)
+        {
+            printf("ROM cache: short read at %08X (%d/%d)\n",
+                   base, (int)got, (int)readlen);
+            return NULL;
+        }
+    }
+
+    page->Base = base;
+    page->Age = CartCacheClock;
+    page->Valid = true;
+    return page;
+}
+
+bool ReadROMBytes(u32 addr, void* dst_, u32 len)
+{
+    u8* dst = (u8*)dst_;
+    if (!dst || !CartROM || !CartROMFile)
+        return false;
+
+    while (len)
+    {
+        if (addr >= CartROMSize)
+            return false;
+
+        u32 logicalremain = CartROMSize - addr;
+        u32 chunk = len;
+        if (chunk > logicalremain)
+            chunk = logicalremain;
+
+        if (addr < CartROMResidentSize)
+        {
+            u32 residentremain = CartROMResidentSize - addr;
+            if (chunk > residentremain)
+                chunk = residentremain;
+
+            memcpy(dst, CartROM + addr, chunk);
+        }
+        else
+        {
+            u32 base = addr & ~(CartCachePageSize - 1);
+            CartCachePage* page = GetROMCachePage(base);
+            if (!page)
+                return false;
+
+            u32 inpage = addr - base;
+            u32 pageremain = CartCachePageSize - inpage;
+            if (chunk > pageremain)
+                chunk = pageremain;
+
+            memcpy(dst, page->Data + inpage, chunk);
+        }
+
+        dst += chunk;
+        addr += chunk;
+        len -= chunk;
+    }
+
+    return true;
 }
 
 
