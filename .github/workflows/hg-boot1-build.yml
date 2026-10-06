@@ -1,0 +1,48 @@
+name: HG-BOOT1 PS2 Build
+
+on:
+  push:
+    branches:
+      - hg-boot1-rom-stream
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build melonDS-PS2
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            ps2dev/ps2dev:latest \
+            sh -lc 'make -j2'
+
+      - name: Package AetherSX2 test ISO
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y genisoimage
+          mkdir -p dist/iso_root
+          cp melonDS.elf dist/melonDS-HG-BOOT1.elf
+          cp melonDS.elf dist/iso_root/MELONDS.ELF
+          printf 'BOOT2 = cdrom0:\\MELONDS.ELF;1\nVER = 1.00\nVMODE = NTSC\n' > dist/iso_root/SYSTEM.CNF
+          genisoimage -quiet -o dist/NDSPS2_HG_BOOT1.iso \
+            -V NDSPS2HG1 -iso-level 1 -J -R dist/iso_root
+          (cd dist && sha256sum melonDS-HG-BOOT1.elf NDSPS2_HG_BOOT1.iso > SHA256SUMS.txt)
+
+      - name: Upload HG-BOOT1 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: melonDS-PS2-HG-BOOT1
+          path: |
+            dist/melonDS-HG-BOOT1.elf
+            dist/NDSPS2_HG_BOOT1.iso
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
