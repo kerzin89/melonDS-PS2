@@ -47,6 +47,10 @@ void DoSavestate(Savestate* file);
 bool LoadROM(const char* path, const char* sram, bool direct);
 void RelocateSave(const char* path, bool write);
 
+// HG-BOOT1: read cartridge bytes without requiring the full ROM in RAM.
+// This is also used by direct boot to stream the ARM9/ARM7 binaries.
+bool ReadROMBytes(u32 addr, void* dst, u32 len);
+
 void WriteROMCnt(u32 val);
 u32 ReadROMData();
 
