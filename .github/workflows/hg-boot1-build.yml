@@ -22,8 +22,8 @@ jobs:
           docker run --rm \
             -v "$PWD:/work" \
             -w /work \
-            ps2dev/ps2dev:latest \
-            sh -lc 'apk add --no-cache make git bash >/dev/null && make -j2'
+            ghcr.io/ps2dev/ps2dev:latest \
+            sh -lc 'apk add --no-cache make git bash >/dev/null && git config --global --add safe.directory /work && make -j2'
 
       - name: Package AetherSX2 test ISO
         run: |
