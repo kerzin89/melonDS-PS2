@@ -17,13 +17,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build melonDS-PS2
+      - name: Install current PS2DEV toolchain
         run: |
-          docker run --rm \
-            -v "$PWD:/work" \
-            -w /work \
-            ghcr.io/ps2dev/ps2dev:latest \
-            sh -lc 'apk add --no-cache make git bash >/dev/null && git config --global --add safe.directory /work && make -j2'
+          sudo mkdir -p /usr/local/ps2dev
+          curl -L --fail --retry 3 \
+            -o /tmp/ps2dev-latest.tar.gz \
+            https://github.com/ps2dev/ps2dev/releases/download/latest/ps2dev-ubuntu-latest.tar.gz
+          sudo tar -xf /tmp/ps2dev-latest.tar.gz --strip-components 1 -C /usr/local/ps2dev
+
+      - name: Build melonDS-PS2
+        env:
+          PS2DEV: /usr/local/ps2dev
+          PS2SDK: /usr/local/ps2dev/ps2sdk
+        run: |
+          export PATH="$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2DEV/iop/bin:$PS2DEV/dvp/bin:$PS2SDK/bin"
+          make -j2
 
       - name: Package AetherSX2 test ISO
         run: |
