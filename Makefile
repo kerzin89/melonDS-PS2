@@ -1,7 +1,7 @@
 EE_BIN = melonDS.elf
 GIT_VERSION := $(shell git describe --abbrev=6 --dirty --always --tags)
 
-BIN2S = $(PS2SDK)/bin/bin2s
+BIN2S = sh tools/bin2s.sh
 
 CPPSOURCES  := src src/ps2
 INCLUDES := src
