@@ -23,7 +23,7 @@ jobs:
             -v "$PWD:/work" \
             -w /work \
             ps2dev/ps2dev:latest \
-            sh -lc 'make -j2'
+            sh -lc 'apk add --no-cache make git bash >/dev/null && make -j2'
 
       - name: Package AetherSX2 test ISO
         run: |
