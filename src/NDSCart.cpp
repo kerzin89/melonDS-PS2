@@ -65,6 +65,141 @@ void Write_Flash(u8 val, bool islast);
 void Write_Discover(u8 val, bool islast);
 
 
+static void InvalidateROMCache()
+{
+    memset(CartCache, 0, sizeof(CartCache));
+    CartCacheClock = 0;
+}
+
+static void CloseROMBacking()
+{
+    if (CartROMFile)
+    {
+        fclose(CartROMFile);
+        CartROMFile = NULL;
+    }
+
+    CartROMFileSize = 0;
+    InvalidateROMCache();
+}
+
+static CartCachePage* GetROMCachePage(u32 base)
+{
+    if (!CartROMFile) return NULL;
+
+    CartCacheClock++;
+    if (CartCacheClock == 0)
+    {
+        CartCacheClock = 1;
+        for (u32 i = 0; i < CartCachePageCount; i++)
+            CartCache[i].Age = 0;
+    }
+
+    for (u32 i = 0; i < CartCachePageCount; i++)
+    {
+        if (CartCache[i].Valid && CartCache[i].Base == base)
+        {
+            CartCache[i].Age = CartCacheClock;
+            return &CartCache[i];
+        }
+    }
+
+    u32 victim = 0;
+    u32 oldest = 0xFFFFFFFF;
+    for (u32 i = 0; i < CartCachePageCount; i++)
+    {
+        if (!CartCache[i].Valid)
+        {
+            victim = i;
+            break;
+        }
+
+        if (CartCache[i].Age < oldest)
+        {
+            oldest = CartCache[i].Age;
+            victim = i;
+        }
+    }
+
+    CartCachePage* page = &CartCache[victim];
+    page->Valid = false;
+    memset(page->Data, 0, CartCachePageSize);
+
+    if (base < CartROMFileSize)
+    {
+        u32 readlen = CartROMFileSize - base;
+        if (readlen > CartCachePageSize)
+            readlen = CartCachePageSize;
+
+        if (fseek(CartROMFile, (long)base, SEEK_SET) != 0)
+        {
+            printf("ROM cache: seek failed at %08X\n", base);
+            return NULL;
+        }
+
+        size_t got = fread(page->Data, 1, readlen, CartROMFile);
+        if (got != readlen)
+        {
+            printf("ROM cache: short read at %08X (%d/%d)\n",
+                   base, (int)got, (int)readlen);
+            return NULL;
+        }
+    }
+
+    page->Base = base;
+    page->Age = CartCacheClock;
+    page->Valid = true;
+    return page;
+}
+
+bool ReadROMBytes(u32 addr, void* dst_, u32 len)
+{
+    u8* dst = (u8*)dst_;
+    if (!dst || !CartROM || !CartROMFile)
+        return false;
+
+    while (len)
+    {
+        if (addr >= CartROMSize)
+            return false;
+
+        u32 logicalremain = CartROMSize - addr;
+        u32 chunk = len;
+        if (chunk > logicalremain)
+            chunk = logicalremain;
+
+        if (addr < CartROMResidentSize)
+        {
+            u32 residentremain = CartROMResidentSize - addr;
+            if (chunk > residentremain)
+                chunk = residentremain;
+
+            memcpy(dst, CartROM + addr, chunk);
+        }
+        else
+        {
+            u32 base = addr & ~(CartCachePageSize - 1);
+            CartCachePage* page = GetROMCachePage(base);
+            if (!page)
+                return false;
+
+            u32 inpage = addr - base;
+            u32 pageremain = CartCachePageSize - inpage;
+            if (chunk > pageremain)
+                chunk = pageremain;
+
+            memcpy(dst, page->Data + inpage, chunk);
+        }
+
+        dst += chunk;
+        addr += chunk;
+        len -= chunk;
+    }
+
+    return true;
+}
+
+
 bool Init()
 {
     SRAM = NULL;
@@ -736,6 +871,26 @@ u32 CartROMSize;
 u32 CartID;
 bool CartIsHomebrew;
 
+// HG-BOOT1: keep only the ROM header/secure area resident.
+// The rest of the cartridge is fetched from the .nds file through a small
+// fixed-size page cache so large retail ROMs do not consume PS2 RAM.
+static const u32 CartROMResidentSize = 0x10000;
+static const u32 CartCachePageSize = 0x4000;
+static const u32 CartCachePageCount = 16;
+
+struct CartCachePage
+{
+    bool Valid;
+    u32 Base;
+    u32 Age;
+    u8 Data[CartCachePageSize];
+};
+
+FILE* CartROMFile;
+u32 CartROMFileSize;
+CartCachePage CartCache[CartCachePageCount];
+u32 CartCacheClock;
+
 u32 CmdEncMode;
 u32 DataEncMode;
 
@@ -853,13 +1008,19 @@ bool Init()
     if (!NDSCart_SRAM::Init()) return false;
 
     CartROM = NULL;
+    CartROMFile = NULL;
+    CartROMFileSize = 0;
+    InvalidateROMCache();
 
     return true;
 }
 
 void DeInit()
 {
+    CloseROMBacking();
+
     if (CartROM) delete[] CartROM;
+    CartROM = NULL;
 
     NDSCart_SRAM::DeInit();
 }
@@ -880,6 +1041,8 @@ void Reset()
     DataOutLen = 0;
 
     CartInserted = false;
+    CloseROMBacking();
+
     if (CartROM) delete[] CartROM;
     CartROM = NULL;
     CartROMSize = 0;
@@ -926,6 +1089,14 @@ void ApplyDLDIPatch()
 
     u32 offset = *(u32*)&CartROM[0x20];
     u32 size = *(u32*)&CartROM[0x2C];
+
+    // DLDI patching mutates the ROM image in-place. In streaming mode only
+    // the first 64 KiB are mutable/resident, so refuse binaries outside it.
+    if (offset >= CartROMResidentSize || size > (CartROMResidentSize - offset))
+    {
+        printf("DLDI patch skipped: binary is outside resident ROM window\n");
+        return;
+    }
 
     u8* binary = &CartROM[offset];
     u32 dldioffset = 0;
@@ -1064,37 +1235,69 @@ void ApplyDLDIPatch()
 
 bool LoadROM(const char* path, const char* sram, bool direct)
 {
-    // TODO: streaming mode? for really big ROMs or systems with limited RAM
-    // for now we're lazy
-
     FILE* f = melon_fopen(path, "rb");
     if (!f)
+        return false;
+
+    // Reset closes the previous cartridge backing file, if any. Keep the new
+    // FILE local until Reset has completed.
+    NDS::Reset();
+
+    if (fseek(f, 0, SEEK_END) != 0)
     {
+        fclose(f);
         return false;
     }
 
-    NDS::Reset();
+    long end = ftell(f);
+    if (end <= 0)
+    {
+        fclose(f);
+        return false;
+    }
 
-    fseek(f, 0, SEEK_END);
-    u32 len = (u32)ftell(f);
+    u32 len = (u32)end;
 
     CartROMSize = 0x200;
     while (CartROMSize < len)
         CartROMSize <<= 1;
 
-    u32 gamecode;
-    fseek(f, 0x0C, SEEK_SET);
-    fread(&gamecode, 4, 1, f);
+    CartROMFile = f;
+    CartROMFileSize = len;
+    InvalidateROMCache();
 
-    printf("ROM: %s - Size: %d- Gamecode: %x\n", path, len, gamecode);
+    // Only the header + secure area stay permanently resident. The rest of
+    // the ROM is read on demand by ReadROMBytes().
+    CartROM = new u8[CartROMResidentSize];
+    memset(CartROM, 0, CartROMResidentSize);
 
-    CartROM = new u8[CartROMSize];
-    memset(CartROM, 0, CartROMSize);
-    fseek(f, 0, SEEK_SET);
-    fread(CartROM, 1, len, f);
+    if (fseek(CartROMFile, 0, SEEK_SET) != 0)
+    {
+        CloseROMBacking();
+        delete[] CartROM;
+        CartROM = NULL;
+        CartROMSize = 0;
+        return false;
+    }
 
-    fclose(f);
-    //CartROM = f;
+    u32 residentread = len;
+    if (residentread > CartROMResidentSize)
+        residentread = CartROMResidentSize;
+
+    if (residentread && fread(CartROM, 1, residentread, CartROMFile) != residentread)
+    {
+        CloseROMBacking();
+        delete[] CartROM;
+        CartROM = NULL;
+        CartROMSize = 0;
+        return false;
+    }
+
+    u32 gamecode = *(u32*)&CartROM[0x0C];
+
+    printf("ROM: %s - Size: %d - Gamecode: %x - streaming cache: %d KB\n",
+           path, len, gamecode,
+           (CartCachePageSize * CartCachePageCount) / 1024);
 
     // generate a ROM ID
     // note: most games don't check the actual value
@@ -1165,7 +1368,8 @@ void ReadROM(u32 addr, u32 len, u32 offset)
     if ((addr+len) > CartROMSize)
         len = CartROMSize - addr;
 
-    memcpy(DataOut+offset, CartROM+addr, len);
+    if (!ReadROMBytes(addr, DataOut+offset, len))
+        printf("ROM cache: read failed at %08X len=%X\n", addr, len);
 }
 
 void ReadROM_B7(u32 addr, u32 len, u32 offset)
@@ -1179,7 +1383,11 @@ void ReadROM_B7(u32 addr, u32 len, u32 offset)
             addr = 0x8000 + (addr & 0x1FF);
     }
 
-    memcpy(DataOut+offset, CartROM+addr, len);
+    if ((addr+len) > CartROMSize)
+        len = CartROMSize - addr;
+
+    if (!ReadROMBytes(addr, DataOut+offset, len))
+        printf("ROM cache B7: read failed at %08X len=%X\n", addr, len);
 }
 
 
