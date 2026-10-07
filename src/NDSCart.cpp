@@ -732,6 +732,12 @@ u32 DataOutLen;
 
 bool CartInserted;
 u8* CartROM;
+// PS2 HG-BOOT2: keep only the header/secure-area hot in EE RAM.
+// The rest of the cartridge is fetched on demand. This avoids allocating
+// the whole (power-of-two padded) ROM in the PS2's 32 MiB main RAM.
+static const u32 CartHotSize = 0x8000;
+FILE* CartROMFile;
+u32 CartROMFileSize;
 u32 CartROMSize;
 u32 CartID;
 bool CartIsHomebrew;
@@ -853,6 +859,8 @@ bool Init()
     if (!NDSCart_SRAM::Init()) return false;
 
     CartROM = NULL;
+    CartROMFile = NULL;
+    CartROMFileSize = 0;
 
     return true;
 }
@@ -860,6 +868,10 @@ bool Init()
 void DeInit()
 {
     if (CartROM) delete[] CartROM;
+    CartROM = NULL;
+    if (CartROMFile) fclose(CartROMFile);
+    CartROMFile = NULL;
+    CartROMFileSize = 0;
 
     NDSCart_SRAM::DeInit();
 }
@@ -882,6 +894,9 @@ void Reset()
     CartInserted = false;
     if (CartROM) delete[] CartROM;
     CartROM = NULL;
+    if (CartROMFile) fclose(CartROMFile);
+    CartROMFile = NULL;
+    CartROMFileSize = 0;
     CartROMSize = 0;
     CartID = 0;
     CartIsHomebrew = false;
@@ -1064,41 +1079,47 @@ void ApplyDLDIPatch()
 
 bool LoadROM(const char* path, const char* sram, bool direct)
 {
-    // TODO: streaming mode? for really big ROMs or systems with limited RAM
-    // for now we're lazy
-
     FILE* f = melon_fopen(path, "rb");
-    if (!f)
-    {
-        return false;
-    }
+    if (!f) return false;
 
     NDS::Reset();
 
     fseek(f, 0, SEEK_END);
     u32 len = (u32)ftell(f);
+    if (len < 0x200)
+    {
+        fclose(f);
+        return false;
+    }
 
+    CartROMFileSize = len;
     CartROMSize = 0x200;
-    while (CartROMSize < len)
-        CartROMSize <<= 1;
+    while (CartROMSize < len) CartROMSize <<= 1;
 
-    u32 gamecode;
-    fseek(f, 0x0C, SEEK_SET);
-    fread(&gamecode, 4, 1, f);
-
-    printf("ROM: %s - Size: %d- Gamecode: %x\n", path, len, gamecode);
-
-    CartROM = new u8[CartROMSize];
-    memset(CartROM, 0, CartROMSize);
+    // Only 32 KiB stays resident. This includes the NDS header and secure area.
+    CartROM = new u8[CartHotSize];
+    if (!CartROM)
+    {
+        fclose(f);
+        return false;
+    }
+    memset(CartROM, 0, CartHotSize);
     fseek(f, 0, SEEK_SET);
-    fread(CartROM, 1, len, f);
+    u32 hotRead = len < CartHotSize ? len : CartHotSize;
+    if (fread(CartROM, 1, hotRead, f) != hotRead)
+    {
+        delete[] CartROM;
+        CartROM = NULL;
+        fclose(f);
+        return false;
+    }
 
-    fclose(f);
-    //CartROM = f;
+    CartROMFile = f;
 
-    // generate a ROM ID
-    // note: most games don't check the actual value
-    // it just has to stay the same throughout gameplay
+    u32 gamecode = *(u32*)&CartROM[0x0C];
+    printf("[HG2][ROM] %s actual=%u virtual=%u hot=%u gamecode=%08X\n",
+           path, len, CartROMSize, hotRead, gamecode);
+
     CartID = 0x00001FC2;
 
     if (*(u32*)&CartROM[0x20] < 0x4000)
@@ -1108,8 +1129,6 @@ bool LoadROM(const char* path, const char* sram, bool direct)
 
     if (direct)
     {
-        // TODO: in the case of an already-encrypted secure area, direct boot
-        // needs it decrypted
         NDS::SetupDirectBoot();
         CmdEncMode = 2;
     }
@@ -1121,33 +1140,25 @@ bool LoadROM(const char* path, const char* sram, bool direct)
     {
         if (arm9base >= 0x4000)
         {
-            // reencrypt secure area if needed
-            if (*(u32*)&CartROM[arm9base] == 0xE7FFDEFF && *(u32*)&CartROM[arm9base+0x10] != 0xE7FFDEFF)
+            if (*(u32*)&CartROM[arm9base] == 0xE7FFDEFF &&
+                *(u32*)&CartROM[arm9base+0x10] != 0xE7FFDEFF)
             {
-                printf("Re-encrypting cart secure area\n");
-
+                printf("[HG2][ROM] re-encrypt secure area\n");
                 strncpy((char*)&CartROM[arm9base], "encryObj", 8);
-
                 Key1_InitKeycode(gamecode, 3, 2);
                 for (u32 i = 0; i < 0x800; i += 8)
                     Key1_Encrypt((u32*)&CartROM[arm9base + i]);
-
                 Key1_InitKeycode(gamecode, 2, 2);
                 Key1_Encrypt((u32*)&CartROM[arm9base]);
             }
         }
-        else
-            CartIsHomebrew = true;
+        else CartIsHomebrew = true;
     }
 
-    // encryption
     Key1_InitKeycode(gamecode, 2, 2);
 
-
-    // save
-    printf("Save file: %s\n", sram);
+    printf("[HG2][SAVE] %s\n", sram);
     NDSCart_SRAM::LoadSave(sram);
-
     return true;
 }
 
@@ -1159,29 +1170,63 @@ void RelocateSave(const char* path, bool write)
 
 void ReadROM(u32 addr, u32 len, u32 offset)
 {
-    if (!CartInserted) return;
-
+    if (!CartInserted || !CartROMFile || !len) return;
     if (addr >= CartROMSize) return;
-    if ((addr+len) > CartROMSize)
-        len = CartROMSize - addr;
+    if ((addr + len) > CartROMSize) len = CartROMSize - addr;
 
-    memcpy(DataOut+offset, CartROM+addr, len);
+    // Padded area past the physical file reads as zero.
+    if (addr >= CartROMFileSize)
+    {
+        memset(DataOut + offset, 0, len);
+        return;
+    }
+    if ((addr + len) > CartROMFileSize)
+    {
+        u32 valid = CartROMFileSize - addr;
+        ReadROM(addr, valid, offset);
+        memset(DataOut + offset + valid, 0, len - valid);
+        return;
+    }
+
+    // Header + secure area are RAM-resident because KEY1 may modify them.
+    if (addr < CartHotSize)
+    {
+        u32 hot = len;
+        if (addr + hot > CartHotSize) hot = CartHotSize - addr;
+        memcpy(DataOut + offset, CartROM + addr, hot);
+        addr += hot;
+        offset += hot;
+        len -= hot;
+        if (!len) return;
+    }
+
+    if (fseek(CartROMFile, addr, SEEK_SET) != 0 ||
+        fread(DataOut + offset, 1, len, CartROMFile) != len)
+    {
+        printf("[HG2][ROM] read error addr=%08X len=%u\n", addr, len);
+        memset(DataOut + offset, 0, len);
+    }
 }
 
 void ReadROM_B7(u32 addr, u32 len, u32 offset)
 {
     if (!CartInserted) return;
 
-    addr &= (CartROMSize-1);
-    if (!CartIsHomebrew)
+    addr &= (CartROMSize - 1);
+    if (!CartIsHomebrew && addr < 0x8000)
+        addr = 0x8000 + (addr & 0x1FF);
+
+    // Handle power-of-two cartridge mirroring without ever allocating the
+    // mirrored image. WriteROMCnt already splits common 4 KiB crossings.
+    if (addr + len <= CartROMSize)
+        ReadROM(addr, len, offset);
+    else
     {
-        if (addr < 0x8000)
-            addr = 0x8000 + (addr & 0x1FF);
+        u32 first = CartROMSize - addr;
+        ReadROM(addr, first, offset);
+        ReadROM(0, len - first, offset + first);
     }
-
-    memcpy(DataOut+offset, CartROM+addr, len);
 }
-
 
 void ROMEndTransfer(u32 param)
 {
