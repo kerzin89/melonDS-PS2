@@ -1,0 +1,8 @@
+*.ELF
+*.elf
+*.iso
+*.o
+build/
+assets/
+baserom*.nds
+pokeheartgold*.nds
