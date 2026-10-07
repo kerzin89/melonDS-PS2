@@ -15,7 +15,7 @@ Legend: **PASS** = verified by build/test; **READY** = implemented and compiled 
 | Private hybrid ISO assembly | **PASS (structure)** | ISO9660/Joliet image assembled from the freshly compiled hybrid ELF and byte-checked against the user-supplied ROM/BIOS inputs. Runtime test still pending. |
 | Hybrid bridge current-source build | **PASS** | the current branch now compiles successfully with the official PS2DEV toolchain. |
 | First HeartGold-driven framebuffer on PS2 | **PASS** | AetherSX2 reached the post-RunFrame renderer and displayed the 256x384 DS framebuffer texture plus the diagnostic corner marker. Visible game imagery is still blank/white at this early frame. |
-| Stable game-frame loop | **PASS (300-frame diagnostic)** | AetherSX2 visibly cycled the heartbeat across hundreds of consecutive NDS frames. Game-visible content is still white/blank. |
+| Stable game-frame loop | **PASS** | AetherSX2 visibly cycled the heartbeat across hundreds of consecutive NDS frames. |
 | Minimum game input | **WIP** | native pad layer exists; game integration depends on frame/boot path. |
 | Minimum audio | **WIP** | native HGPS2 audio remains optional/stubbed for first visual milestone. |
 | Minimum persistent save | **WIP** | hybrid optical-disc builds route save files away from the read-only ISO; native Memory Card backend remains later Stage 1 work. |
@@ -164,3 +164,27 @@ The current CPU-liveness probe is based directly on the verified 300-frame rende
 - two additional red/green status squares.
 
 No framebuffer conversion, DS display-register reads, or forced Threaded3D change is included in this probe. This keeps the experiment single-variable and preserves the last verified visual path.
+
+
+## CPU liveness result — PASS
+
+The rollback CPU-liveness probe was executed in AetherSX2 and all four indicators reached green:
+
+1. frame heartbeat is advancing;
+2. framebuffer contents are changing;
+3. ARM9 program counter is moving;
+4. ARM7 program counter is moving.
+
+This confirms that the HeartGold core is not merely repainting a frozen buffer: both emulated processors continue executing across the multi-frame loop.
+
+### Stage 1 interpretation
+
+The project has now proven the following chain in AetherSX2:
+
+`PS2 ISO -> R5900 ELF -> DS core init -> HeartGold ROM load -> ARM9/ARM7 execution -> repeated NDS frames -> changing framebuffer -> PS2 GS presentation`
+
+The large DS surface remains white. This is now treated as a graphics/display-state correctness problem rather than a general boot or CPU-execution failure.
+
+### Next target
+
+Investigate DS display activation and 2D/3D rendering state without disturbing the known-good CPU/frame loop. Changes must be introduced one at a time against the CPU-liveness baseline.
