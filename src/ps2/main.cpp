@@ -788,20 +788,20 @@ int main(int argc, char **argv){
 
     int resetRetries = 120;
     while (!SifIopReset(NULL, 0) && resetRetries-- > 0)
-        DelayThread(1000);
+        nopdelay();
     if (resetRetries <= 0) {
         printf("[HG-BOOT] ERROR: IOP reset timeout\n");
         showBootStage(STAGE_MAGENTA_RGBAQ);
-        for (;;) DelayThread(100000);
+        for (;;) nopdelay();
     }
 
     int syncRetries = 600;
     while (!SifIopSync() && syncRetries-- > 0)
-        DelayThread(1000);
+        nopdelay();
     if (syncRetries <= 0) {
         printf("[HG-BOOT] ERROR: IOP sync timeout\n");
         showBootStage(STAGE_MAGENTA_RGBAQ);
-        for (;;) DelayThread(100000);
+        for (;;) nopdelay();
     }
 
     SifInitRpc(0);
