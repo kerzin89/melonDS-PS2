@@ -18,6 +18,7 @@
 
 #include <malloc.h>
 #include <stdio.h>
+#include <string.h>
 #include <kernel.h>
 
 // Deal with conflicting typedefs
@@ -57,9 +58,10 @@ void Thread_Free(void* thread)
 void Thread_Wait(void* thread)
 {
     ee_thread_status_t info;
-    while (info.status != THS_WAITSUSPEND){
+    memset(&info, 0, sizeof(info));
+    do {
         ReferThreadStatus((int)thread, &info);
-    }
+    } while (info.status != THS_WAITSUSPEND);
 }
 
 void* Semaphore_Create()
