@@ -1,0 +1,52 @@
+# Stage 1 — Functionality status
+
+Last updated: 2026-10-07
+
+Legend: **PASS** = verified by build/test; **READY** = implemented and compiled but runtime test pending; **WIP** = being implemented; **BLOCKED** = external/test dependency.
+
+| Micro-stage | Status | Evidence / next test |
+| --- | --- | --- |
+| Native R5900 toolchain build | **PASS** | `HGPS2.ELF` compiled successfully in the official PS2DEV container in GitHub Actions. |
+| Native GS frame loop | **READY** | gsKit/dmaKit double-buffered loop compiles; real PS2/PCSX2 execution still must be confirmed. |
+| PS2 timing/FPS measurement | **READY** | PS2SDK system timer backend and FPS sampling compile in the native target. |
+| DualShock 2 input | **READY** | Pad backend compiles and maps PS2 controls to HeartGold/DS keypad bits; runtime test pending. |
+| HeartGold-style input repeat state | **READY** | held/new/repeated state logic implemented from the reconstructed behavior. |
+| Native overlay lifecycle | **READY** | `init -> exec -> exit` manager implemented without DS ITCM/DTCM placement. |
+| Private hybrid ISO assembly | **PASS (structure)** | ISO9660/Joliet image assembled and byte-checked against the user-supplied ROM/BIOS inputs. |
+| Hybrid bridge current-source build | **WIP** | modern PS2DEV compatibility fixes are being applied to the legacy melonDS target. |
+| First genuine HeartGold frame on PS2 | **BLOCKED on runtime test** | no genuine game frame has been confirmed yet. |
+| Stable game-frame loop | **WIP** | depends on first genuine frame. |
+| Minimum game input | **WIP** | native pad layer exists; game integration depends on frame/boot path. |
+| Minimum audio | **WIP** | native HGPS2 audio remains optional/stubbed for first visual milestone. |
+| Minimum persistent save | **WIP** | hybrid optical-disc builds route save files away from the read-only ISO; native Memory Card backend remains later Stage 1 work. |
+
+## Current native runtime
+
+The native runtime now includes:
+
+- R5900/PS2SDK build;
+- GS frame presentation;
+- PS2 system timer;
+- FPS measurement;
+- DualShock 2 input;
+- HeartGold-compatible keypad bit layout and repeat state;
+- native overlay/application lifecycle;
+- diagnostic logs for frame count, FPS and button transitions.
+
+This is infrastructure, not yet the game.
+
+## Current hybrid bridge
+
+The legacy melonDS PS2 core remains a temporary bridge for the earliest real-game-frame experiment. It can:
+
+- execute `NDS::RunFrame()`;
+- expose `GPU::Framebuffer` to the PS2 GS path;
+- probe optical-disc HeartGold paths;
+- read BIOS/firmware from ISO or USB after current-source rebuild;
+- redirect writable save state away from optical media.
+
+The hybrid bridge will be removed or reduced as native HGPS2 replacements become functional.
+
+## Immediate exit condition
+
+The next major Stage 1 checkpoint is **one verified, advancing genuine HeartGold framebuffer on PCSX2 or real PS2**. Until that is observed, no game-FPS claim is valid.
