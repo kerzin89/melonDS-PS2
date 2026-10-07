@@ -36,3 +36,15 @@ replaces PS2-hostile pieces incrementally.
 8. Re-enable audio only after the CPU/frame path is stable.
 
 No Nintendo ROM, BIOS or firmware data is included.
+
+## Phase 2: interpreter/memory hot path
+
+- ARM7 Main RAM reads/writes now bypass the generic NDS address dispatcher.
+- 8/16/32-bit accesses retain the original alignment and waitstate accounting.
+- ARM9 is deliberately left behind CP15 handlers: bypassing CP15 would break
+  TCM/protection semantics and is not a safe optimization.
+- Instruction fetch already uses melonDS MemRegion caching, so the next CPU
+  optimization should be driven by measurements rather than duplicating that path.
+
+The next validation gate is a PS2SDK build plus an HG2 boot log. If it reaches
+the direct-boot-ready marker, profile scheduler/IRQ frequency and GPU2D cost.
