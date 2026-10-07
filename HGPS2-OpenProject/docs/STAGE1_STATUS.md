@@ -14,7 +14,7 @@ Legend: **PASS** = verified by build/test; **READY** = implemented and compiled 
 | Native overlay lifecycle | **READY** | `init -> exec -> exit` manager implemented without DS ITCM/DTCM placement. |
 | Private hybrid ISO assembly | **PASS (structure)** | ISO9660/Joliet image assembled from the freshly compiled hybrid ELF and byte-checked against the user-supplied ROM/BIOS inputs. Runtime test still pending. |
 | Hybrid bridge current-source build | **PASS** | the current branch now compiles successfully with the official PS2DEV toolchain. |
-| First genuine HeartGold frame on PS2 | **CORE FRAME PASS / PRESENTATION WIP** | AetherSX2 reached gold after the first isolated `NDS::RunFrame()` returned. Rendering the produced framebuffer to GS is the current blocker. |
+| First HeartGold-driven framebuffer on PS2 | **PASS** | AetherSX2 reached the post-RunFrame renderer and displayed the 256x384 DS framebuffer texture plus the diagnostic corner marker. Visible game imagery is still blank/white at this early frame. |
 | Stable game-frame loop | **WIP** | depends on first genuine frame. |
 | Minimum game input | **WIP** | native pad layer exists; game integration depends on frame/boot path. |
 | Minimum audio | **WIP** | native HGPS2 audio remains optional/stubbed for first visual milestone. |
@@ -126,3 +126,18 @@ This confirms that the emulator core can advance at least one real HeartGold fra
 The renderer inspection found a concrete bug: `GSTEXTURE` was allocated with `malloc()` and only a subset of fields was initialized. Fields such as `Clut`, `Vram`, `VramClut`, `TBW`, `Delayed` and CLUT metadata could contain garbage. `gsKit_TexManager_bind()` checks and uses these fields, so garbage state can cause an invalid palette/cache/VRAM path exactly after the first frame.
 
 The texture is now zero-initialized with `calloc()`, all critical fields are set explicitly, and framebuffer upload is diagnosed separately from sprite submission.
+
+
+## Framebuffer presentation result — PASS
+
+After zero-initializing `GSTEXTURE` and explicitly initializing its CLUT/VRAM/TBW state, AetherSX2 displayed the 256x384 Nintendo DS framebuffer region on the PS2 GS. The separate white corner marker was also visible, confirming that the post-frame sprite submission and GS flip completed.
+
+The visible DS framebuffer was still solid white in the captured frame. This is not currently treated as a renderer failure: the first DS frame can legitimately be blank/forced-white during startup. The next diagnostic therefore focuses on **multi-frame progression**, not pixel-format changes.
+
+A new autonomous probe executes 300 `NDS::RunFrame()` calls before reintroducing controller/savestate work. It renders every frame and adds:
+
+- a top-left marker cycling red -> green -> blue -> white every 16 frames;
+- a second marker that turns green once sampled framebuffer pixels contain data other than known blank/reset values;
+- console counters every 30 frames.
+
+If the marker cycles, the emulator is advancing multiple HeartGold frames. If the lower marker turns green, the game framebuffer has begun producing non-blank visual content even if the texture presentation still needs correction.
