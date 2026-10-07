@@ -1168,40 +1168,58 @@ void RelocateSave(const char* path, bool write)
     NDSCart_SRAM::RelocateSave(path, write);
 }
 
-void ReadROM(u32 addr, u32 len, u32 offset)
+bool CopyROM(void* dst, u32 addr, u32 len)
 {
-    if (!CartInserted || !CartROMFile || !len) return;
-    if (addr >= CartROMSize) return;
-    if ((addr + len) > CartROMSize) len = CartROMSize - addr;
+    u8* out = (u8*)dst;
+    if (!CartInserted || !CartROMFile) return false;
 
-    // Padded area past the physical file reads as zero.
+    if (addr >= CartROMSize)
+    {
+        memset(out, 0, len);
+        return true;
+    }
+
+    if ((addr + len) > CartROMSize)
+    {
+        u32 valid = CartROMSize - addr;
+        if (!CopyROM(out, addr, valid)) return false;
+        memset(out + valid, 0, len - valid);
+        return true;
+    }
+
     if (addr >= CartROMFileSize)
     {
-        memset(DataOut + offset, 0, len);
-        return;
+        memset(out, 0, len);
+        return true;
     }
+
     if ((addr + len) > CartROMFileSize)
     {
         u32 valid = CartROMFileSize - addr;
-        ReadROM(addr, valid, offset);
-        memset(DataOut + offset + valid, 0, len - valid);
-        return;
+        if (!CopyROM(out, addr, valid)) return false;
+        memset(out + valid, 0, len - valid);
+        return true;
     }
 
-    // Header + secure area are RAM-resident because KEY1 may modify them.
     if (addr < CartHotSize)
     {
         u32 hot = len;
         if (addr + hot > CartHotSize) hot = CartHotSize - addr;
-        memcpy(DataOut + offset, CartROM + addr, hot);
+        memcpy(out, CartROM + addr, hot);
         addr += hot;
-        offset += hot;
+        out += hot;
         len -= hot;
-        if (!len) return;
+        if (!len) return true;
     }
 
-    if (fseek(CartROMFile, addr, SEEK_SET) != 0 ||
-        fread(DataOut + offset, 1, len, CartROMFile) != len)
+    if (fseek(CartROMFile, addr, SEEK_SET) != 0) return false;
+    return fread(out, 1, len, CartROMFile) == len;
+}
+
+void ReadROM(u32 addr, u32 len, u32 offset)
+{
+    if (!len) return;
+    if (!CopyROM(DataOut + offset, addr, len))
     {
         printf("[HG2][ROM] read error addr=%08X len=%u\n", addr, len);
         memset(DataOut + offset, 0, len);
