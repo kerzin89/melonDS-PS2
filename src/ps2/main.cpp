@@ -965,7 +965,7 @@ int main(int argc, char **argv){
     // HG-BOOT2: keep this path single-threaded while the first frame is isolated.
     printf("[HG2] low-memory single-thread execution enabled\n");
 
-    vram_buffer = (GSTEXTURE*)malloc(sizeof(GSTEXTURE));
+    vram_buffer = (GSTEXTURE*)calloc(1, sizeof(GSTEXTURE));
     if (!vram_buffer) {
         printf("[HG-FRAME] ERROR: GSTEXTURE allocation failed\n");
         showBootStage(STAGE_MAGENTA_RGBAQ);
@@ -975,8 +975,15 @@ int main(int argc, char **argv){
     vram_buffer->Width = 256;
     vram_buffer->Height = 384;
     vram_buffer->PSM = GS_PSM_CT32;
-    vram_buffer->Filter = GS_FILTER_NEAREST;
+    vram_buffer->ClutPSM = 0;
+    vram_buffer->TBW = 0;
     vram_buffer->Mem = GPU::Framebuffer;
+    vram_buffer->Clut = NULL;
+    vram_buffer->Vram = 0;
+    vram_buffer->VramClut = 0;
+    vram_buffer->Filter = GS_FILTER_NEAREST;
+    vram_buffer->ClutStorageMode = 0;
+    vram_buffer->Delayed = 0;
 
     showBootStage(STAGE_PINK_RGBAQ);
     printf("[HG-FRAME] stage 10: framebuffer texture ready\n");
@@ -994,12 +1001,25 @@ int main(int argc, char **argv){
     printf("[HG-FRAME] stage 12: NDS::RunFrame() returned\n");
 
     gsKit_TexManager_invalidate(gsGlobal, vram_buffer);
+    showBootStage(STAGE_WHITE_RGBAQ);
+    printf("[HG-FRAME] stage 13: texture invalidated safely\n");
+
+    /*
+     * Bind explicitly so the texture upload can be diagnosed separately from
+     * sprite generation. The old code malloc'ed GSTEXTURE without clearing
+     * fields such as Clut/Vram, which can make TexManager follow garbage
+     * pointers after the first emulated frame.
+     */
+    gsKit_TexManager_bind(gsGlobal, vram_buffer);
+    showBootStage(STAGE_LIME_RGBAQ);
+    printf("[HG-FRAME] stage 14: framebuffer uploaded/bound to GS\n");
+
     gsKit_clear(gsGlobal, BLACK_RGBAQ);
     drawFunc();
     gsKit_prim_sprite(gsGlobal, 8.0f, 8.0f, 40.0f, 40.0f, 1,
                       GS_SETREG_RGBAQ(0xFF,0xFF,0xFF,0x80,0x00));
     flipScreen();
-    printf("[HG-FRAME] stage 13: first framebuffer submitted to GS\n");
+    printf("[HG-FRAME] stage 15: first framebuffer submitted to GS\n");
 
     uint32_t keys[] = { PAD_CROSS, PAD_CIRCLE, PAD_SELECT, PAD_START, PAD_RIGHT, PAD_LEFT, PAD_UP, PAD_DOWN, PAD_R1, PAD_L1, PAD_SQUARE, PAD_TRIANGLE };
     bool Touching = false;
