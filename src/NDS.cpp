@@ -246,7 +246,7 @@ void SetupDirectBoot()
 
     CP15::Write(0x910, 0x0300000A);
     CP15::Write(0x911, 0x00000020);
-    CP15::Write(0x100, 0x00050000);
+    CP15::Write(0x100, 0x00052078); // match current melonDS direct-boot ARM9 control state
 
     ARM9->R[12] = bootparams[1];
     ARM9->R[13] = 0x03002F7C;
