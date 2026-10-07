@@ -1,0 +1,16 @@
+*.nds
+*.NDS
+*.gbc
+*.gba
+*.7z
+*.zip
+*.iso
+*.ISO
+*.elf
+*.ELF
+*.o
+baserom*
+roms/
+assets/
+extracted/
+build/
