@@ -52,3 +52,21 @@ The current-source hybrid bridge and native runtime both pass the R5900 build in
 ## Immediate exit condition
 
 The next major Stage 1 checkpoint is **one verified, advancing genuine HeartGold framebuffer on PCSX2 or real PS2**. Until that is observed, no game-FPS claim is valid.
+
+
+## Black-screen diagnostic — 2026-10-07
+
+The first private Stage 1 HeartGold ISO reached the hardware test but produced a black screen. The bridge previously initialized GS only after IOP reset/module loading, which made every early boot failure indistinguishable from an ELF that never started.
+
+The bridge now initializes GS immediately on EE entry and displays a sequence of solid boot-stage colors before the game framebuffer is available:
+
+- red: EE + GS entered;
+- orange: IOP reset/sync complete;
+- yellow: core IOP modules complete;
+- blue: storage modules complete;
+- green: pad/USB path complete;
+- purple: font/UI initialized and ROM lookup starting;
+- cyan: ROM/BIOS paths resolved and NDS core startup beginning;
+- magenta: bounded IOP reset/sync timeout.
+
+The IOP reset and sync loops are now bounded instead of being able to hang forever on a black screen. Both native and hybrid targets compile successfully after these diagnostics were added.
