@@ -188,3 +188,21 @@ The large DS surface remains white. This is now treated as a graphics/display-st
 ### Next target
 
 Investigate DS display activation and 2D/3D rendering state without disturbing the known-good CPU/frame loop. Changes must be introduced one at a time against the CPU-liveness baseline.
+
+
+## Display-engine probe ready
+
+Starting from the verified four-green CPU-liveness baseline, the next build keeps the known-good framebuffer/GS path intact and changes only:
+
+- ARM9 CP15 direct-boot control from `0x00050000` to `0x00052078`, matching the relevant control state used by current melonDS;
+- two new visual indicators for DS 2D engine A/B display state.
+
+The build passes the current PS2DEV/R5900 CI. The private test ISO preserves the same ROM/BIOS payload previously verified in AetherSX2 and replaces only the hybrid ELF.
+
+Indicator order for this build:
+1. frame heartbeat;
+2. framebuffer changed;
+3. ARM9 PC moved;
+4. ARM7 PC moved;
+5. engine A display active;
+6. engine B display active.
