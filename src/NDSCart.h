@@ -47,6 +47,10 @@ void DoSavestate(Savestate* file);
 bool LoadROM(const char* path, const char* sram, bool direct);
 void RelocateSave(const char* path, bool write);
 
+// HG-BOOT2 low-memory cartridge access. Reads physical ROM bytes without
+// requiring the complete cartridge image to live in EE RAM.
+bool CopyROM(void* dst, u32 addr, u32 len);
+
 void WriteROMCnt(u32 val);
 u32 ReadROMData();
 
