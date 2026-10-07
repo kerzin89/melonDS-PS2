@@ -15,7 +15,7 @@
 
 ## Current state
 
-The native runtime is an early skeleton. It is not a playable HeartGold port. Pad/video/audio functions still contain P0 stubs and the reconstructed game logic is not yet linked into the R5900 target.
+The native runtime is an early Stage 1 compatibility runtime, not a playable HeartGold port. The R5900 target now builds successfully in the official PS2DEV container. GS video, PS2 timing, DualShock 2 input, HeartGold-like keypad state and a native overlay lifecycle are implemented. Native audio and actual reconstructed HeartGold game integration are still incomplete.
 
 ## Next technical work
 
@@ -69,3 +69,12 @@ A private ISO builder is provided at `tools/make_hybrid_iso.sh`. It requires the
 Current unverified risk: CD/DVD filesystem initialization and newlib path behavior on real hardware/PCSX2. The code probes both `cdrom0:` and `cdfs:` spellings and logs each attempt. PS2SDK provides CD/DVD access, but this stage must be tested rather than assumed successful.
 
 If the hybrid route reaches game frames, it becomes a behavioral oracle while HGPS2 replaces emulator services one subsystem at a time.
+
+
+## Stage 1 build/runtime update — 2026-10-07
+
+The native `HGPS2.ELF` has now compiled successfully through GitHub Actions using the current PS2DEV toolchain. This verifies the R5900 build path; it does **not** yet verify execution on PCSX2 or physical hardware.
+
+A private test ISO was also assembled from user-supplied HeartGold/BIOS/firmware inputs and structurally validated as ISO9660/Joliet. The commercial inputs are not stored in this repository. No real HeartGold frame has yet been confirmed from that ISO.
+
+The legacy hybrid bridge exposed additional modern-toolchain build errors, which are being fixed in CI rather than hidden. See `STAGE1_STATUS.md` for the current factual checklist.
