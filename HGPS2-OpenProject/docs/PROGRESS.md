@@ -78,3 +78,10 @@ The native `HGPS2.ELF` has now compiled successfully through GitHub Actions usin
 A private test ISO was also assembled from user-supplied HeartGold/BIOS/firmware inputs and structurally validated as ISO9660/Joliet. The commercial inputs are not stored in this repository. No real HeartGold frame has yet been confirmed from that ISO.
 
 The legacy hybrid bridge exposed additional modern-toolchain build errors, which are being fixed in CI rather than hidden. See `STAGE1_STATUS.md` for the current factual checklist.
+
+
+## Current-source hybrid build passes — 2026-10-07
+
+The legacy/hybrid PS2 target now also builds successfully against the current official PS2DEV environment. Compatibility fixes included replacing the removed `bin2s` flow with `bin2c`, updating directory handling for the current `dirent` API, updating the gsKit VSync callback signature, and removing obsolete type assumptions in the disabled LAN callback.
+
+A new private Stage 1 ISO was assembled with the freshly compiled hybrid ELF. Its ISO9660/Joliet directory records and embedded user-supplied ROM/BIOS/firmware payloads were byte-verified. The runtime result remains intentionally unclaimed until the ISO is executed on PCSX2 or physical PS2.
