@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include "Config.h"
 #include <string>
 #ifdef _WIN32
@@ -173,6 +174,25 @@ FILE* GetConfigFile(const char* fileName, const char* permissions)
     std::string path = std::string("mass:/melonDS/") + fileName;
     f = fopen(path.c_str(), permissions);
     if (f) return f;
+
+    /* Hybrid ISO builds keep BIOS/firmware next to the ELF. Never try to
+     * write configuration back to the read-only disc. */
+    if (permissions && permissions[0] == 'r') {
+        std::string isoName(fileName);
+        for (size_t i = 0; i < isoName.size(); ++i)
+            isoName[i] = (char)toupper((unsigned char)isoName[i]);
+
+        const char *prefixes[] = { "cdrom0:\\", "cdfs:\\" };
+        for (unsigned int i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); ++i) {
+            path = std::string(prefixes[i]) + isoName + ";1";
+            f = fopen(path.c_str(), permissions);
+            if (f) return f;
+
+            path = std::string(prefixes[i]) + isoName;
+            f = fopen(path.c_str(), permissions);
+            if (f) return f;
+        }
+    }
 #else
     // Now check XDG_CONFIG_HOME
     // TODO: check for memory leak there
