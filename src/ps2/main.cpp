@@ -403,6 +403,12 @@ void flipScreen()
 
 static bool fileExists(const char *path)
 {
+    FILE *f = fopen(path, "rb");
+    if (f != NULL) {
+        fclose(f);
+        return true;
+    }
+
     struct stat st;
     return stat(path, &st) == 0 && !S_ISDIR(st.st_mode);
 }
@@ -822,9 +828,25 @@ int main(int argc, char **argv){
     sema_params.init_count = 1;
     EmuSema = CreateSema(&sema_params);
 
-    string rompath = FindIsoHeartGold();\n    if (rompath.empty())\n        rompath = Menu();
-    string srampath = rompath.substr(0, rompath.rfind(".")) + ".sav";
-    string statepath = rompath.substr(0, rompath.rfind(".")) + ".mln";
+    string rompath = FindIsoHeartGold();
+    if (rompath.empty())
+        rompath = Menu();
+
+    const bool romFromDisc =
+        rompath.find("cdrom0:") == 0 || rompath.find("cdfs:") == 0;
+
+    string srampath;
+    string statepath;
+    if (romFromDisc) {
+        /* Optical media is read-only. Keep persistent files on USB while the
+         * Memory Card backend is still a Stage 1 task. */
+        srampath = "mass:/melonDS/heartgold.sav";
+        statepath = "mass:/melonDS/heartgold.mln";
+        printf("[HG-ISO] save path: %s\n", srampath.c_str());
+    } else {
+        srampath = rompath.substr(0, rompath.rfind(".")) + ".sav";
+        statepath = rompath.substr(0, rompath.rfind(".")) + ".mln";
+    }
 
     Config::Load();
     if (!Config::HasConfigFile("bios7.bin") || !Config::HasConfigFile("bios9.bin") || !Config::HasConfigFile("firmware.bin"))
@@ -835,7 +857,7 @@ int main(int argc, char **argv){
             gsKit_fontm_print_scaled(gsGlobal, font, 5-0.5f, 40-0.5f, 1, 0.6, 0x80FFFFFF, "bios7.bin -- ARM7 BIOS");
             gsKit_fontm_print_scaled(gsGlobal, font, 5-0.5f, 60-0.5f, 1, 0.6, 0x80FFFFFF, "bios9.bin -- ARM9 BIOS");
             gsKit_fontm_print_scaled(gsGlobal, font, 5-0.5f, 80-0.5f, 1, 0.6, 0x80FFFFFF, "firmware.bin -- firmware image");
-            gsKit_fontm_print_scaled(gsGlobal, font, 5-0.5f, 150-0.5f, 1, 0.6, 0x80FFFFFF, "Dump the files from your DS and place them in your pendrive.");
+            gsKit_fontm_print_scaled(gsGlobal, font, 5-0.5f, 150-0.5f, 1, 0.6, 0x80FFFFFF, "Provide your dumped BIOS/firmware on the ISO or mass:/melonDS/.");
             flipScreen();
         }
     }
