@@ -97,6 +97,14 @@ extern unsigned char fileXio_irx[];
 extern unsigned int size_fileXio_irx;
 
 static const u64 BLACK_RGBAQ   = GS_SETREG_RGBAQ(0x00,0x00,0x00,0x80,0x00);
+static const u64 STAGE_RED_RGBAQ     = GS_SETREG_RGBAQ(0x80,0x00,0x00,0x80,0x00);
+static const u64 STAGE_ORANGE_RGBAQ  = GS_SETREG_RGBAQ(0x80,0x30,0x00,0x80,0x00);
+static const u64 STAGE_YELLOW_RGBAQ  = GS_SETREG_RGBAQ(0x70,0x70,0x00,0x80,0x00);
+static const u64 STAGE_BLUE_RGBAQ    = GS_SETREG_RGBAQ(0x00,0x20,0x80,0x80,0x00);
+static const u64 STAGE_GREEN_RGBAQ   = GS_SETREG_RGBAQ(0x00,0x70,0x20,0x80,0x00);
+static const u64 STAGE_PURPLE_RGBAQ  = GS_SETREG_RGBAQ(0x50,0x00,0x70,0x80,0x00);
+static const u64 STAGE_CYAN_RGBAQ    = GS_SETREG_RGBAQ(0x00,0x60,0x60,0x80,0x00);
+static const u64 STAGE_MAGENTA_RGBAQ = GS_SETREG_RGBAQ(0x70,0x00,0x50,0x80,0x00);
 
 GSGLOBAL *gsGlobal = NULL;
 GSFONTM *font = NULL;
@@ -700,6 +708,14 @@ int PlayAudio(unsigned int argc, void *argv)
     return 0;
 }
 
+static void showBootStage(u64 color)
+{
+    if (!gsGlobal)
+        return;
+    gsKit_clear(gsGlobal, color);
+    flipScreen();
+}
+
 void initGraphics()
 {
 	ee_sema_t sema;
@@ -759,10 +775,38 @@ void initGraphics()
 
 int main(int argc, char **argv){
 
+    /*
+     * Bring the GS up before touching the IOP. The old port did the opposite,
+     * so any early IOP/module failure looked like a completely dead black
+     * screen. Stage colors now make the boot path observable on real hardware.
+     */
+    initGraphics();
+    showBootStage(STAGE_RED_RGBAQ);
+    printf("[HG-BOOT] stage 1: EE/GS alive\n");
+
     SifInitRpc(0);
-    while (!SifIopReset("", 0)){};
-    while (!SifIopSync()){};
+
+    int resetRetries = 120;
+    while (!SifIopReset(NULL, 0) && resetRetries-- > 0)
+        DelayThread(1000);
+    if (resetRetries <= 0) {
+        printf("[HG-BOOT] ERROR: IOP reset timeout\n");
+        showBootStage(STAGE_MAGENTA_RGBAQ);
+        for (;;) DelayThread(100000);
+    }
+
+    int syncRetries = 600;
+    while (!SifIopSync() && syncRetries-- > 0)
+        DelayThread(1000);
+    if (syncRetries <= 0) {
+        printf("[HG-BOOT] ERROR: IOP sync timeout\n");
+        showBootStage(STAGE_MAGENTA_RGBAQ);
+        for (;;) DelayThread(100000);
+    }
+
     SifInitRpc(0);
+    showBootStage(STAGE_ORANGE_RGBAQ);
+    printf("[HG-BOOT] stage 2: IOP reset/sync complete\n");
 	int x, y;
 	int cy;
 	u8  *image;
@@ -798,11 +842,17 @@ int main(int argc, char **argv){
     // load pad & mc modules 
     printf("Installing Pad & MC modules...\n");
 
+    showBootStage(STAGE_YELLOW_RGBAQ);
+    printf("[HG-BOOT] stage 3: core IOP modules complete\n");
+
     // load USB modules    
     SifExecModuleBuffer(&usbd_irx, size_usbd_irx, 0, NULL, NULL);
     SifExecModuleBuffer(&bdm_irx, size_bdm_irx, 0, NULL, NULL);
     SifExecModuleBuffer(&bdmfs_vfat_irx, size_bdmfs_vfat_irx, 0, NULL, NULL);
     SifExecModuleBuffer(&usbmass_bd_irx, size_usbmass_bd_irx, 0, NULL, NULL);
+
+    showBootStage(STAGE_BLUE_RGBAQ);
+    printf("[HG-BOOT] stage 4: storage modules complete\n");
 
     SifExecModuleBuffer(&audsrv_irx, size_audsrv_irx, 0, NULL, NULL);
     audsrv_init();
@@ -830,8 +880,8 @@ int main(int argc, char **argv){
     }
 
     pad_init();
-
-    initGraphics();
+    showBootStage(STAGE_GREEN_RGBAQ);
+    printf("[HG-BOOT] stage 5: pad + USB modules complete\n");
     
     font = gsKit_init_fontm();
 	gsKit_fontm_upload(gsGlobal, font);
@@ -841,6 +891,9 @@ int main(int argc, char **argv){
     sema_params.max_count = 1;
     sema_params.init_count = 1;
     EmuSema = CreateSema(&sema_params);
+
+    showBootStage(STAGE_PURPLE_RGBAQ);
+    printf("[HG-BOOT] stage 6: UI/font initialized; locating ROM\n");
 
     string rompath = FindIsoHeartGold();
     if (rompath.empty())
@@ -876,6 +929,8 @@ int main(int argc, char **argv){
         }
     }
 
+    showBootStage(STAGE_CYAN_RGBAQ);
+    printf("[HG-BOOT] stage 7: ROM/BIOS paths resolved\n");
     printf("[HG2] initializing NDS core\n");
     NDS::Init();
     printf("[HG2] loading cartridge\n");
@@ -889,6 +944,7 @@ int main(int argc, char **argv){
     }
 
     printf("[HG2] cartridge loaded; entering emulation loop\n");
+    showBootStage(BLACK_RGBAQ);
 
     //sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
 
