@@ -796,7 +796,7 @@ int main(int argc, char **argv){
     sema_params.init_count = 1;
     EmuSema = CreateSema(&sema_params);
 
-    string rompath = Menu();
+    string rompath = FindIsoHeartGold();\n    if (rompath.empty())\n        rompath = Menu();
     string srampath = rompath.substr(0, rompath.rfind(".")) + ".sav";
     string statepath = rompath.substr(0, rompath.rfind(".")) + ".mln";
 
