@@ -354,8 +354,9 @@ void scr_printf(unsigned int color,  const char *format, ...) {
 }
 
 /* PRIVATE METHODS */
-static int vsync_handler()
+static int vsync_handler(int cause)
 {
+   (void)cause;
    iSignalSema(vsync_sema_id);
 
    ExitHandler();
@@ -450,7 +451,20 @@ string Menu()
         while ((entry = readdir(dir)) != NULL)
         {
             string name = entry->d_name;
-            if (S_ISDIR(entry->d_stat.st_mode) || name.find(".nds", (name.length() - 4)) != string::npos)
+            string fullpath = rompath;
+            struct stat entryStat;
+            bool isDir = false;
+            bool isNds = name.length() >= 4 &&
+                name.compare(name.length() - 4, 4, ".nds") == 0;
+
+            if (!fullpath.empty() && fullpath[fullpath.length() - 1] != '/')
+                fullpath += "/";
+            fullpath += name;
+
+            if (stat(fullpath.c_str(), &entryStat) == 0)
+                isDir = S_ISDIR(entryStat.st_mode);
+
+            if (isDir || isNds)
                 files.push_back(name);
         }
         closedir(dir);
