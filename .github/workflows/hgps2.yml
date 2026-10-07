@@ -22,6 +22,8 @@ jobs:
     container: ghcr.io/ps2dev/ps2dev:latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install build tools
+        run: apk add --no-cache make
       - name: Build native HGPS2 runtime
         working-directory: hgps2
         run: make clean all
@@ -44,6 +46,8 @@ jobs:
     container: ghcr.io/ps2dev/ps2dev:latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install build tools
+        run: apk add --no-cache make
       - name: Build legacy hybrid bridge ELF
         run: make clean all
       - name: Inspect hybrid ELF
