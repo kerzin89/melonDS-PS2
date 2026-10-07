@@ -12,8 +12,8 @@ Legend: **PASS** = verified by build/test; **READY** = implemented and compiled 
 | DualShock 2 input | **READY** | Pad backend compiles and maps PS2 controls to HeartGold/DS keypad bits; runtime test pending. |
 | HeartGold-style input repeat state | **READY** | held/new/repeated state logic implemented from the reconstructed behavior. |
 | Native overlay lifecycle | **READY** | `init -> exec -> exit` manager implemented without DS ITCM/DTCM placement. |
-| Private hybrid ISO assembly | **PASS (structure)** | ISO9660/Joliet image assembled and byte-checked against the user-supplied ROM/BIOS inputs. |
-| Hybrid bridge current-source build | **WIP** | modern PS2DEV compatibility fixes are being applied to the legacy melonDS target. |
+| Private hybrid ISO assembly | **PASS (structure)** | ISO9660/Joliet image assembled from the freshly compiled hybrid ELF and byte-checked against the user-supplied ROM/BIOS inputs. Runtime test still pending. |
+| Hybrid bridge current-source build | **PASS** | the current branch now compiles successfully with the official PS2DEV toolchain. |
 | First genuine HeartGold frame on PS2 | **BLOCKED on runtime test** | no genuine game frame has been confirmed yet. |
 | Stable game-frame loop | **WIP** | depends on first genuine frame. |
 | Minimum game input | **WIP** | native pad layer exists; game integration depends on frame/boot path. |
@@ -46,6 +46,8 @@ The legacy melonDS PS2 core remains a temporary bridge for the earliest real-gam
 - redirect writable save state away from optical media.
 
 The hybrid bridge will be removed or reduced as native HGPS2 replacements become functional.
+
+The current-source hybrid bridge and native runtime both pass the R5900 build in GitHub Actions. The private Stage 1 ISO places `HEARTGOLD.NDS`, BIOS7, BIOS9 and firmware at paths expected by the bridge and keeps saves on writable external storage.
 
 ## Immediate exit condition
 
