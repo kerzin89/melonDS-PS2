@@ -5,7 +5,8 @@ Build a private Stage 1 hybrid PS2 ISO from user-supplied files.
 This script does not ship any Nintendo ROM, BIOS, firmware or game assets.
 It takes an existing small bootable ISO template, replaces/redirects the
 MELONDS.ELF entry, adds BIOS/firmware to the root directory, creates a ROMS
-subdirectory and places the user-owned HeartGold dump there.
+subdirectory and also exposes the user-owned HeartGold dump at the disc root.
+The root alias matches the current hybrid bridge's direct-boot probe.
 
 The template is expected to be ISO9660 with a primary volume descriptor,
 a Joliet supplementary descriptor, a root directory that fits in one sector,
@@ -189,12 +190,14 @@ def main() -> None:
         dir_record(b7_extent, b7_size, b"BIOS7.BIN;1"),
         dir_record(b9_extent, b9_size, b"BIOS9.BIN;1"),
         dir_record(fw_extent, fw_size, b"FIRMWARE.BIN;1"),
+        dir_record(rom_extent, rom_size, b"HEARTGOLD.NDS;1"),
     ])
     append_root_records(image, j_root, [
         dir_record(j_roms, SECTOR, "ROMS".encode("utf-16-be"), flags=2),
         dir_record(b7_extent, b7_size, "BIOS7.BIN".encode("utf-16-be")),
         dir_record(b9_extent, b9_size, "BIOS9.BIN".encode("utf-16-be")),
         dir_record(fw_extent, fw_size, "FIRMWARE.BIN".encode("utf-16-be")),
+        dir_record(rom_extent, rom_size, "HEARTGOLD.NDS".encode("utf-16-be")),
     ])
 
     replace_root_file(image, p_root, b"MELONDS.ELF;1", elf_extent, elf_size)
