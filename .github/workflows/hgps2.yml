@@ -1,0 +1,34 @@
+name: HGPS2 R5900 Build
+
+on:
+  push:
+    branches: [hg-boot2]
+    paths:
+      - 'hgps2/**'
+      - '.github/workflows/hgps2.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/ps2dev/ps2dev:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build HGPS2 ELF
+        working-directory: hgps2
+        run: make clean all
+      - name: Inspect ELF
+        working-directory: hgps2
+        run: |
+          file HGPS2.ELF || true
+          mips64r5900el-ps2-elf-readelf -h HGPS2.ELF
+      - name: Package test files
+        run: |
+          mkdir -p hgps2-dist
+          cp hgps2/HGPS2.ELF hgps2-dist/
+          cp hgps2/iso/SYSTEM.CNF hgps2-dist/
+          cp hgps2/README.md hgps2-dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HGPS2-R5900-P0
+          path: hgps2-dist/
