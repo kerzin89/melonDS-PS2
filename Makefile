@@ -1,7 +1,7 @@
 EE_BIN = melonDS.elf
 GIT_VERSION := $(shell git describe --abbrev=6 --dirty --always --tags)
 
-BIN2S = $(PS2SDK)/bin/bin2s
+BIN2C = $(PS2SDK)/bin/bin2c
 
 CPPSOURCES  := src src/ps2
 INCLUDES := src
@@ -27,68 +27,68 @@ EE_CXXFLAGS += -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-rtti -mtune=r5
 all: $(EE_BIN)
 
 #-------------------- Embedded IOP Modules ------------------------#
-src/iomanx.s: $(PS2SDK)/iop/irx/iomanX.irx
+src/iomanx.c: $(PS2SDK)/iop/irx/iomanX.irx
 	echo "Embedding iomanX Driver..."
-	$(BIN2S) $< $@ iomanX_irx
+	$(BIN2C) $< $@ iomanX_irx
 
-src/filexio.s: $(PS2SDK)/iop/irx/fileXio.irx
+src/filexio.c: $(PS2SDK)/iop/irx/fileXio.irx
 	echo "Embedding fileXio Driver..."
-	$(BIN2S) $< $@ fileXio_irx
+	$(BIN2C) $< $@ fileXio_irx
 
-src/sio2man.s: $(PS2SDK)/iop/irx/sio2man.irx
+src/sio2man.c: $(PS2SDK)/iop/irx/sio2man.irx
 	echo "Embedding SIO2MAN Driver..."
-	$(BIN2S) $< $@ sio2man_irx
+	$(BIN2C) $< $@ sio2man_irx
 	
-src/mcman.s: $(PS2SDK)/iop/irx/mcman.irx
+src/mcman.c: $(PS2SDK)/iop/irx/mcman.irx
 	echo "Embedding MCMAN Driver..."
-	$(BIN2S) $< $@ mcman_irx
+	$(BIN2C) $< $@ mcman_irx
 
-src/mcserv.s: $(PS2SDK)/iop/irx/mcserv.irx
+src/mcserv.c: $(PS2SDK)/iop/irx/mcserv.irx
 	echo "Embedding MCSERV Driver..."
-	$(BIN2S) $< $@ mcserv_irx
+	$(BIN2C) $< $@ mcserv_irx
 
-src/padman.s: $(PS2SDK)/iop/irx/padman.irx
+src/padman.c: $(PS2SDK)/iop/irx/padman.irx
 	echo "Embedding PADMAN Driver..."
-	$(BIN2S) $< $@ padman_irx
+	$(BIN2C) $< $@ padman_irx
 	
-src/libsd.s: $(PS2SDK)/iop/irx/libsd.irx
+src/libsd.c: $(PS2SDK)/iop/irx/libsd.irx
 	echo "Embedding LIBSD Driver..."
-	$(BIN2S) $< $@ libsd_irx
+	$(BIN2C) $< $@ libsd_irx
 
-src/usbd.s: $(PS2SDK)/iop/irx/usbd.irx
+src/usbd.c: $(PS2SDK)/iop/irx/usbd.irx
 	echo "Embedding USB Driver..."
-	$(BIN2S) $< $@ usbd_irx
+	$(BIN2C) $< $@ usbd_irx
 
-src/audsrv.s: $(PS2SDK)/iop/irx/audsrv.irx
+src/audsrv.c: $(PS2SDK)/iop/irx/audsrv.irx
 	echo "Embedding AUDSRV Driver..."
-	$(BIN2S) $< $@ audsrv_irx
+	$(BIN2C) $< $@ audsrv_irx
 
-src/bdm.s: $(PS2SDK)/iop/irx/bdm.irx
+src/bdm.c: $(PS2SDK)/iop/irx/bdm.irx
 	echo "Embedding Block Device Manager(BDM)..."
-	$(BIN2S) $< $@ bdm_irx
+	$(BIN2C) $< $@ bdm_irx
 
-src/bdmfs_vfat.s: $(PS2SDK)/iop/irx/bdmfs_vfat.irx
+src/bdmfs_vfat.c: $(PS2SDK)/iop/irx/bdmfs_vfat.irx
 	echo "Embedding BDM VFAT Driver..."
-	$(BIN2S) $< $@ bdmfs_vfat_irx
+	$(BIN2C) $< $@ bdmfs_vfat_irx
 
-src/usbmass_bd.s: $(PS2SDK)/iop/irx/usbmass_bd.irx
+src/usbmass_bd.c: $(PS2SDK)/iop/irx/usbmass_bd.irx
 	echo "Embedding BD USB Mass Driver..."
-	$(BIN2S) $< $@ usbmass_bd_irx
+	$(BIN2C) $< $@ usbmass_bd_irx
 
 #------------------------------------------------------------------#
 
 clean:
 	@rm -rf $(EE_BIN) $(EE_OBJS)
-	rm -f src/sio2man.s
-	rm -f src/mcman.s
-	rm -f src/mcserv.s
-	rm -f src/padman.s
-	rm -f src/libsd.s
-	rm -f src/bdm.s
-	rm -f src/usbd.s
-	rm -f src/audsrv.s
-	rm -f src/bdmfs_vfat.s
-	rm -f src/usbmass_bd.s
+	rm -f src/sio2man.c
+	rm -f src/mcman.c
+	rm -f src/mcserv.c
+	rm -f src/padman.c
+	rm -f src/libsd.c
+	rm -f src/bdm.c
+	rm -f src/usbd.c
+	rm -f src/audsrv.c
+	rm -f src/bdmfs_vfat.c
+	rm -f src/usbmass_bd.c
 
 include $(PS2SDK)/samples/Makefile.pref
 include $(PS2SDK)/samples/Makefile.eeglobal_cpp
