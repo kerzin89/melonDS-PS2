@@ -152,3 +152,15 @@ The second diagnostic square remained green, which means sampled framebuffer con
 The large DS surface remained visually white. Source inspection showed that melonDS intentionally renders an inactive/forced-blank DS display as white, so the remaining white surface may reflect DS display state rather than a failed GS upload.
 
 The next diagnostic therefore records ARM9/ARM7 PC movement and both DS `DISPCNT` values, forces `DirectBoot=1`, disables legacy threaded 3D, and converts melonDS BGRA8888 into gsKit RGBA8888 before texture upload.
+
+
+## Renderer regression rollback
+
+The combined BGRA->RGBA conversion / forced renderer configuration / display-register diagnostic build regressed to a fully black output in AetherSX2. Because the preceding 300-frame build was known-good, those changes were intentionally rolled back rather than debugged as a bundle.
+
+The current CPU-liveness probe is based directly on the verified 300-frame renderer path and adds only:
+- ARM9 program-counter movement tracking;
+- ARM7 program-counter movement tracking;
+- two additional red/green status squares.
+
+No framebuffer conversion, DS display-register reads, or forced Threaded3D change is included in this probe. This keeps the experiment single-variable and preserves the last verified visual path.
