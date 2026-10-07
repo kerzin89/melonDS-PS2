@@ -20,7 +20,9 @@ EE_OBJS     := $(IOP_MODULES) $(addsuffix .o,$(BINFILES)) $(CPPFILES:.cpp=.o)
 
 export INCLUDE	:= $(foreach dir,$(INCLUDES),-I$(dir))
 
-EE_CXXFLAGS += -mtune=r5900 -msingle-float -fno-exceptions -std=gnu++11 -D__PS2__
+# HG-BOOT2: conservative R5900 optimization. The old core relies heavily on
+# type-punning, so keep strict aliasing disabled while optimizing hot CPU/MMIO paths.
+EE_CXXFLAGS += -O2 -fomit-frame-pointer -fno-strict-aliasing -fno-rtti -mtune=r5900 -msingle-float -fno-exceptions -std=gnu++11 -D__PS2__
 
 all: $(EE_BIN)
 
