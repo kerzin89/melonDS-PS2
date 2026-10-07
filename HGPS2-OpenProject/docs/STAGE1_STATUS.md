@@ -70,3 +70,29 @@ The bridge now initializes GS immediately on EE entry and displays a sequence of
 - magenta: bounded IOP reset/sync timeout.
 
 The IOP reset and sync loops are now bounded instead of being able to hang forever on a black screen. Both native and hybrid targets compile successfully after these diagnostics were added.
+
+
+## From-scratch sanity ISO — 2026-10-07
+
+After a second black-screen report, the ISO path was isolated from the HeartGold/melonDS path completely.
+
+A new `hgps2/sanity` target now builds a minimal R5900 ELF that only:
+
+1. initializes gsKit/dmaKit;
+2. initializes the GS;
+3. clears the screen red;
+4. draws a white rectangle;
+5. remains in the GS flip loop.
+
+It does not initialize pad, audio, filesystem, IOP modules, melonDS, BIOS or HeartGold.
+
+The sanity ISO is built from scratch with xorriso in CI rather than modifying the previous ISO template. Its `SYSTEM.CNF` uses the canonical single-backslash boot path:
+
+`BOOT2 = cdrom0:\HGBOOT.ELF;1`
+
+The first xorriso build exposed and fixed an escaping bug that had produced two backslashes in the sanity `BOOT2` path. The corrected sanity ISO now builds successfully and is the lowest-level test for the user's launcher/emulator/console path.
+
+Interpretation:
+- red screen + white rectangle = ISO loader, ELF startup, DMA and GS are proven;
+- black screen = failure occurs before or during minimal ELF/GS startup and is unrelated to HeartGold;
+- sanity passes but hybrid stays black = continue debugging the hybrid initialization path.
