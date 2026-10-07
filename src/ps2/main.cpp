@@ -158,9 +158,6 @@ u8 *BufferData[2];
 uint8_t AudioIdx = 0;
 
 u32 *Framebuffer;
-/* melonDS produces BGRA8888; gsKit CT32 expects byte-order RGBA. Keep an
- * aligned presentation buffer so emulation memory stays untouched. */
-static u32 Ps2Framebuffer[256 * 192 * 2] __attribute__((aligned(64)));
 unsigned int TouchBoundLeft, TouchBoundRight, TouchBoundTop, TouchBoundBottom;
 
 s32 EmuSema;
@@ -720,27 +717,6 @@ int PlayAudio(unsigned int argc, void *argv)
     return 0;
 }
 
-static void convertFramebufferForGs()
-{
-    const unsigned int total = 256 * 192 * 2;
-    for (unsigned int i = 0; i < total; ++i) {
-        const u32 c = GPU::Framebuffer[i]; /* memory bytes: B,G,R,A */
-        const u32 r = (c >> 16) & 0xFF;
-        const u32 g = (c >> 8) & 0xFF;
-        const u32 b = c & 0xFF;
-        Ps2Framebuffer[i] = r | (g << 8) | (b << 16) | 0x80000000;
-    }
-}
-
-static bool dsDisplayActive()
-{
-    const u32 a = GPU::GPU2D_A ? GPU::GPU2D_A->Read32(0) : 0;
-    const u32 b = GPU::GPU2D_B ? GPU::GPU2D_B->Read32(0) : 0;
-    const bool aActive = !(a & (1u << 7)) && (((a >> 16) & 0x3) != 0);
-    const bool bActive = !(b & (1u << 7)) && (((b >> 16) & 0x1) != 0);
-    return aActive || bActive;
-}
-
 static unsigned int framebuffer_nonwhite_samples()
 {
     unsigned int changed = 0;
@@ -964,13 +940,6 @@ int main(int argc, char **argv){
     }
 
     Config::Load();
-    /* Stage 1 must be deterministic: bypass firmware UI and avoid the legacy
-     * PS2 thread backend while validating basic HeartGold execution. */
-    Config::DirectBoot = 1;
-    Config::Threaded3D = 0;
-    Config::ScreenLayout = 0;
-    printf("[HG2] forced DirectBoot=1 Threaded3D=0 ScreenLayout=0\n");
-
     if (!Config::HasConfigFile("bios7.bin") || !Config::HasConfigFile("bios9.bin") || !Config::HasConfigFile("firmware.bin"))
     {
         while (true){
@@ -1023,7 +992,7 @@ int main(int argc, char **argv){
     vram_buffer->PSM = GS_PSM_CT32;
     vram_buffer->ClutPSM = 0;
     vram_buffer->TBW = 0;
-    vram_buffer->Mem = Ps2Framebuffer;
+    vram_buffer->Mem = GPU::Framebuffer;
     vram_buffer->Clut = NULL;
     vram_buffer->Vram = 0;
     vram_buffer->VramClut = 0;
@@ -1046,7 +1015,6 @@ int main(int argc, char **argv){
     showBootStage(STAGE_GOLD_RGBAQ);
     printf("[HG-FRAME] stage 12: NDS::RunFrame() returned\n");
 
-    convertFramebufferForGs();
     gsKit_TexManager_invalidate(gsGlobal, vram_buffer);
     showBootStage(STAGE_WHITE_RGBAQ);
     printf("[HG-FRAME] stage 13: texture invalidated safely\n");
@@ -1081,7 +1049,6 @@ int main(int argc, char **argv){
     u32 lastPc7 = NDS::GetPC(1);
     bool arm9Moved = false;
     bool arm7Moved = false;
-    bool displayActivated = dsDisplayActive();
 
     while (hgFrameCounter < 300) {
         NDS::RunFrame();
@@ -1093,13 +1060,11 @@ int main(int argc, char **argv){
         if (pc7 != lastPc7) arm7Moved = true;
         lastPc9 = pc9;
         lastPc7 = pc7;
-        if (dsDisplayActive()) displayActivated = true;
 
         unsigned int nonBlank = framebuffer_nonwhite_samples();
         if (nonBlank)
             everNonBlank += nonBlank;
 
-        convertFramebufferForGs();
         gsKit_TexManager_invalidate(gsGlobal, vram_buffer);
         gsKit_clear(gsGlobal, 0x80000000);
         drawFunc();
@@ -1112,30 +1077,29 @@ int main(int argc, char **argv){
         default: heartbeat = GS_SETREG_RGBAQ(0xFF,0xFF,0xFF,0x80,0x00); break;
         }
 
-        /* Status squares, top to bottom:
-         * 1 heartbeat, 2 framebuffer changed, 3 ARM9 PC moved,
-         * 4 ARM7 PC moved, 5 DS display was enabled. */
+        /* Known-good renderer + CPU liveness only:
+         * 1 heartbeat, 2 framebuffer changed, 3 ARM9 PC moved, 4 ARM7 PC moved. */
         gsKit_prim_sprite(gsGlobal, 8.0f, 8.0f, 40.0f, 40.0f, 1, heartbeat);
-        gsKit_prim_sprite(gsGlobal, 8.0f, 48.0f, 40.0f, 80.0f, 1,
-            everNonBlank ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
-                         : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
-        gsKit_prim_sprite(gsGlobal, 8.0f, 88.0f, 40.0f, 120.0f, 1,
-            arm9Moved ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
-                      : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
-        gsKit_prim_sprite(gsGlobal, 8.0f, 128.0f, 40.0f, 160.0f, 1,
-            arm7Moved ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
-                      : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
-        gsKit_prim_sprite(gsGlobal, 8.0f, 168.0f, 40.0f, 200.0f, 1,
-            displayActivated ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
-                             : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
+        gsKit_prim_sprite(
+            gsGlobal, 8.0f, 48.0f, 40.0f, 80.0f, 1,
+            everNonBlank
+                ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
+                : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
+        gsKit_prim_sprite(
+            gsGlobal, 8.0f, 88.0f, 40.0f, 120.0f, 1,
+            arm9Moved
+                ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
+                : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
+        gsKit_prim_sprite(
+            gsGlobal, 8.0f, 128.0f, 40.0f, 160.0f, 1,
+            arm7Moved
+                ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
+                : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
         flipScreen();
 
-        if ((hgFrameCounter % 30) == 0) {
-            const u32 dispA = GPU::GPU2D_A ? GPU::GPU2D_A->Read32(0) : 0;
-            const u32 dispB = GPU::GPU2D_B ? GPU::GPU2D_B->Read32(0) : 0;
-            printf("[HG-FRAME] frame=%u pc9=%08X pc7=%08X dispA=%08X dispB=%08X nonblank=%u\n",
-                   hgFrameCounter, pc9, pc7, dispA, dispB, nonBlank);
-        }
+        if ((hgFrameCounter % 30) == 0)
+            printf("[HG-CPU] frame=%u pc9=%08X pc7=%08X nonblank=%u ever=%u\n",
+                   hgFrameCounter, pc9, pc7, nonBlank, everNonBlank);
     }
 
     printf("[HG-FRAME] autonomous 300-frame probe complete; entering interactive loop\n");
@@ -1215,7 +1179,6 @@ int main(int argc, char **argv){
 
         NDS::RunFrame();
         ++hgFrameCounter;
-        convertFramebufferForGs();
         gsKit_TexManager_invalidate(gsGlobal, vram_buffer);
         gsKit_clear(gsGlobal, 0x80000000);
         drawFunc();
