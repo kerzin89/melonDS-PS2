@@ -79,6 +79,8 @@ src/usbmass_bd.c: $(PS2SDK)/iop/irx/usbmass_bd.irx
 
 clean:
 	@rm -rf $(EE_BIN) $(EE_OBJS)
+	rm -f src/iomanx.c
+	rm -f src/filexio.c
 	rm -f src/sio2man.c
 	rm -f src/mcman.c
 	rm -f src/mcserv.c
