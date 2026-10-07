@@ -54,6 +54,7 @@ int hgps2_file_write_all(const char *path, const void *data, size_t size);
 int  hgps2_video_init(int width, int height);
 void hgps2_video_begin(void);
 void hgps2_video_present(void);
+void hgps2_video_debug_input(hg_u16 held);
 
 int  hgps2_audio_init(unsigned sample_rate);
 void hgps2_audio_submit(const int16_t *stereo, size_t frames);
