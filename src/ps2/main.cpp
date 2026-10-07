@@ -1095,11 +1095,26 @@ int main(int argc, char **argv){
             arm7Moved
                 ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
                 : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
+
+        const u32 dispA = GPU::GPU2D_A->Read32(0);
+        const u32 dispB = GPU::GPU2D_B->Read32(0);
+        const bool aOn = !(dispA & (1u << 7)) && (((dispA >> 16) & 0x3) != 0);
+        const bool bOn = !(dispB & (1u << 7)) && (((dispB >> 16) & 0x1) != 0);
+
+        gsKit_prim_sprite(
+            gsGlobal, 8.0f, 168.0f, 40.0f, 200.0f, 1,
+            aOn ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
+                : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
+        gsKit_prim_sprite(
+            gsGlobal, 8.0f, 208.0f, 40.0f, 240.0f, 1,
+            bOn ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
+                : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
+
         flipScreen();
 
         if ((hgFrameCounter % 30) == 0)
-            printf("[HG-CPU] frame=%u pc9=%08X pc7=%08X nonblank=%u ever=%u\n",
-                   hgFrameCounter, pc9, pc7, nonBlank, everNonBlank);
+            printf("[HG-DISP] frame=%u pc9=%08X pc7=%08X dispA=%08X dispB=%08X nonblank=%u\n",
+                   hgFrameCounter, pc9, pc7, dispA, dispB, nonBlank);
     }
 
     printf("[HG-FRAME] autonomous 300-frame probe complete; entering interactive loop\n");
