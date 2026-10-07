@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install build tools
-        run: apk add --no-cache make
+        run: apk add --no-cache make git
       - name: Build native HGPS2 runtime
         working-directory: hgps2
         run: make clean all
@@ -47,7 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install build tools
-        run: apk add --no-cache make
+        run: apk add --no-cache make git
       - name: Build legacy hybrid bridge ELF
         run: make clean all
       - name: Inspect hybrid ELF
