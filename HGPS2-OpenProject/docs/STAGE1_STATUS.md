@@ -15,7 +15,7 @@ Legend: **PASS** = verified by build/test; **READY** = implemented and compiled 
 | Private hybrid ISO assembly | **PASS (structure)** | ISO9660/Joliet image assembled from the freshly compiled hybrid ELF and byte-checked against the user-supplied ROM/BIOS inputs. Runtime test still pending. |
 | Hybrid bridge current-source build | **PASS** | the current branch now compiles successfully with the official PS2DEV toolchain. |
 | First HeartGold-driven framebuffer on PS2 | **PASS** | AetherSX2 reached the post-RunFrame renderer and displayed the 256x384 DS framebuffer texture plus the diagnostic corner marker. Visible game imagery is still blank/white at this early frame. |
-| Stable game-frame loop | **WIP** | depends on first genuine frame. |
+| Stable game-frame loop | **PASS (300-frame diagnostic)** | AetherSX2 visibly cycled the heartbeat across hundreds of consecutive NDS frames. Game-visible content is still white/blank. |
 | Minimum game input | **WIP** | native pad layer exists; game integration depends on frame/boot path. |
 | Minimum audio | **WIP** | native HGPS2 audio remains optional/stubbed for first visual milestone. |
 | Minimum persistent save | **WIP** | hybrid optical-disc builds route save files away from the read-only ISO; native Memory Card backend remains later Stage 1 work. |
@@ -141,3 +141,14 @@ A new autonomous probe executes 300 `NDS::RunFrame()` calls before reintroducing
 - console counters every 30 frames.
 
 If the marker cycles, the emulator is advancing multiple HeartGold frames. If the lower marker turns green, the game framebuffer has begun producing non-blank visual content even if the texture presentation still needs correction.
+
+
+## Multi-frame progression result — PASS
+
+The 300-frame probe was executed in AetherSX2. The top heartbeat square repeatedly changed colors, paused on white for part of the cycle, then resumed changing. This proves the emulation loop is continuing across many consecutive `NDS::RunFrame()` calls rather than freezing on the first frame.
+
+The second diagnostic square remained green, which means sampled framebuffer contents differed from the initial all-white/all-black/reset patterns at some point during the run.
+
+The large DS surface remained visually white. Source inspection showed that melonDS intentionally renders an inactive/forced-blank DS display as white, so the remaining white surface may reflect DS display state rather than a failed GS upload.
+
+The next diagnostic therefore records ARM9/ARM7 PC movement and both DS `DISPCNT` values, forces `DirectBoot=1`, disables legacy threaded 3D, and converts melonDS BGRA8888 into gsKit RGBA8888 before texture upload.
