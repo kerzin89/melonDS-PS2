@@ -161,44 +161,84 @@ void DeInit()
 void SetupDirectBoot()
 {
     u32 bootparams[8];
-    memcpy(bootparams, &NDSCart::CartROM[0x20], 8*4);
+    if (!NDSCart::CopyROM(bootparams, 0x20, sizeof(bootparams)))
+    {
+        printf("[HG2][BOOT] failed to read boot parameters\n");
+        return;
+    }
 
-    printf("ARM9: offset=%08X entry=%08X RAM=%08X size=%08X\n",
+    printf("[HG2][BOOT] ARM9 off=%08X entry=%08X RAM=%08X size=%08X\n",
            bootparams[0], bootparams[1], bootparams[2], bootparams[3]);
-    printf("ARM7: offset=%08X entry=%08X RAM=%08X size=%08X\n",
+    printf("[HG2][BOOT] ARM7 off=%08X entry=%08X RAM=%08X size=%08X\n",
            bootparams[4], bootparams[5], bootparams[6], bootparams[7]);
 
     MapSharedWRAM(3);
 
-    for (u32 i = 0; i < bootparams[3]; i+=4)
+    // Stream executable sections in chunks. A word-at-a-time fseek/fread path
+    // is catastrophically slow on USB mass storage.
+    static u8 bootbuf[0x4000];
+
+    for (u32 pos = 0; pos < bootparams[3]; pos += sizeof(bootbuf))
     {
-        u32 tmp = *(u32*)&NDSCart::CartROM[bootparams[0]+i];
-        ARM9Write32(bootparams[2]+i, tmp);
+        u32 n = bootparams[3] - pos;
+        if (n > sizeof(bootbuf)) n = sizeof(bootbuf);
+        if (!NDSCart::CopyROM(bootbuf, bootparams[0] + pos, n))
+        {
+            printf("[HG2][BOOT] ARM9 ROM read failed at %08X\n", bootparams[0] + pos);
+            return;
+        }
+        for (u32 i = 0; i < n; i += 4)
+        {
+            u32 tmp = 0;
+            u32 left = n - i;
+            memcpy(&tmp, bootbuf + i, left >= 4 ? 4 : left);
+            ARM9Write32(bootparams[2] + pos + i, tmp);
+        }
     }
 
-    for (u32 i = 0; i < bootparams[7]; i+=4)
+    for (u32 pos = 0; pos < bootparams[7]; pos += sizeof(bootbuf))
     {
-        u32 tmp = *(u32*)&NDSCart::CartROM[bootparams[4]+i];
-        ARM7Write32(bootparams[6]+i, tmp);
+        u32 n = bootparams[7] - pos;
+        if (n > sizeof(bootbuf)) n = sizeof(bootbuf);
+        if (!NDSCart::CopyROM(bootbuf, bootparams[4] + pos, n))
+        {
+            printf("[HG2][BOOT] ARM7 ROM read failed at %08X\n", bootparams[4] + pos);
+            return;
+        }
+        for (u32 i = 0; i < n; i += 4)
+        {
+            u32 tmp = 0;
+            u32 left = n - i;
+            memcpy(&tmp, bootbuf + i, left >= 4 ? 4 : left);
+            ARM7Write32(bootparams[6] + pos + i, tmp);
+        }
     }
 
-    for (u32 i = 0; i < 0x170; i+=4)
+    u8 hdr[0x170];
+    if (!NDSCart::CopyROM(hdr, 0, sizeof(hdr)))
     {
-        u32 tmp = *(u32*)&NDSCart::CartROM[i];
-        ARM9Write32(0x027FFE00+i, tmp);
+        printf("[HG2][BOOT] header read failed\n");
+        return;
+    }
+    for (u32 i = 0; i < sizeof(hdr); i += 4)
+    {
+        u32 tmp = 0;
+        u32 left = sizeof(hdr) - i;
+        memcpy(&tmp, hdr + i, left >= 4 ? 4 : left);
+        ARM9Write32(0x027FFE00 + i, tmp);
     }
 
     ARM9Write32(0x027FF800, NDSCart::CartID);
     ARM9Write32(0x027FF804, NDSCart::CartID);
-    ARM9Write16(0x027FF808, *(u16*)&NDSCart::CartROM[0x15E]);
-    ARM9Write16(0x027FF80A, *(u16*)&NDSCart::CartROM[0x6C]);
+    ARM9Write16(0x027FF808, *(u16*)&hdr[0x15E]);
+    ARM9Write16(0x027FF80A, *(u16*)&hdr[0x6C]);
 
     ARM9Write16(0x027FF850, 0x5835);
 
     ARM9Write32(0x027FFC00, NDSCart::CartID);
     ARM9Write32(0x027FFC04, NDSCart::CartID);
-    ARM9Write16(0x027FFC08, *(u16*)&NDSCart::CartROM[0x15E]);
-    ARM9Write16(0x027FFC0A, *(u16*)&NDSCart::CartROM[0x6C]);
+    ARM9Write16(0x027FFC08, *(u16*)&hdr[0x15E]);
+    ARM9Write16(0x027FFC0A, *(u16*)&hdr[0x6C]);
 
     ARM9Write16(0x027FFC10, 0x5835);
     ARM9Write16(0x027FFC30, 0xFFFF);
@@ -225,20 +265,16 @@ void SetupDirectBoot()
 
     PostFlag9 = 0x01;
     PostFlag7 = 0x01;
-
     PowerControl9 = 0x820F;
     GPU::DisplaySwap(PowerControl9);
-
-    // checkme
     RCnt = 0x8000;
-
     NDSCart::SPICnt = 0x8000;
-
     SPU::SetBias(0x200);
-
     ARM7BIOSProt = 0x1204;
-
     SPI_Firmware::SetupDirectBoot();
+
+    printf("[HG2][BOOT] direct boot ready ARM9=%08X ARM7=%08X\n",
+           bootparams[1], bootparams[5]);
 }
 
 void Reset()
