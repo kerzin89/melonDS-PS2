@@ -1,34 +1,57 @@
-name: HGPS2 R5900 Build
+name: HGPS2 Stage 1 Build
 
 on:
   push:
     branches: [hg-boot2]
     paths:
       - 'hgps2/**'
+      - 'src/**'
+      - 'Makefile'
+      - '.github/workflows/hgps2.yml'
+  pull_request:
+    paths:
+      - 'hgps2/**'
+      - 'src/**'
+      - 'Makefile'
       - '.github/workflows/hgps2.yml'
   workflow_dispatch:
 
 jobs:
-  build:
+  native-runtime:
     runs-on: ubuntu-latest
     container: ghcr.io/ps2dev/ps2dev:latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build HGPS2 ELF
+      - name: Build native HGPS2 runtime
         working-directory: hgps2
         run: make clean all
-      - name: Inspect ELF
+      - name: Inspect R5900 ELF
         working-directory: hgps2
         run: |
           file HGPS2.ELF || true
           mips64r5900el-ps2-elf-readelf -h HGPS2.ELF
-      - name: Package test files
-        run: |
-          mkdir -p hgps2-dist
-          cp hgps2/HGPS2.ELF hgps2-dist/
-          cp hgps2/iso/SYSTEM.CNF hgps2-dist/
-          cp hgps2/README.md hgps2-dist/
+          mips64r5900el-ps2-elf-size HGPS2.ELF
       - uses: actions/upload-artifact@v4
         with:
-          name: HGPS2-R5900-P0
-          path: hgps2-dist/
+          name: HGPS2-native-stage1
+          path: |
+            hgps2/HGPS2.ELF
+            hgps2/iso/SYSTEM.CNF
+            hgps2/README.md
+
+  hybrid-bridge:
+    runs-on: ubuntu-latest
+    container: ghcr.io/ps2dev/ps2dev:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build legacy hybrid bridge ELF
+        run: make clean all
+      - name: Inspect hybrid ELF
+        run: |
+          file melonDS.elf || true
+          mips64r5900el-ps2-elf-readelf -h melonDS.elf
+          mips64r5900el-ps2-elf-size melonDS.elf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HGPS2-hybrid-bridge
+          path: melonDS.elf
