@@ -134,7 +134,7 @@ int LAN_SendPacket(u8* data, int len)
     return 0;
 }
 
-void LAN_RXCallback(u_char* blarg, const struct pcap_pkthdr* header, const u_char* data)
+void LAN_RXCallback(unsigned char* blarg, const struct pcap_pkthdr* header, const unsigned char* data)
 {
 }
 
