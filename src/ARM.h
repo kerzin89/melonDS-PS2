@@ -144,6 +144,13 @@ public:
 
     u8 DataRead8(u32 addr, u32 forceuser=0)
     {
+        Cycles += Waitstates[2][(addr>>24)&0xF];
+
+        // HG-BOOT2 hot path: ARM7 has no CP15 data mapping. Main RAM accesses
+        // dominate game code, so avoid the full NDS memory dispatcher here.
+        if (Num && ((addr & 0xFF000000) == 0x02000000))
+            return NDS::MainRAM[addr & (MAIN_RAM_SIZE - 1)];
+
         u8 val;
         if (!Num)
         {
@@ -152,15 +159,18 @@ public:
         }
         else
             val = NDS::ARM7Read8(addr);
-
-        Cycles += Waitstates[2][(addr>>24)&0xF];
         return val;
     }
 
     u16 DataRead16(u32 addr, u32 forceuser=0)
     {
-        u16 val;
         addr &= ~1;
+        Cycles += Waitstates[2][(addr>>24)&0xF];
+
+        if (Num && ((addr & 0xFF000000) == 0x02000000))
+            return *(u16*)&NDS::MainRAM[addr & (MAIN_RAM_SIZE - 1)];
+
+        u16 val;
         if (!Num)
         {
             if (!CP15::HandleDataRead16(addr, &val, forceuser))
@@ -168,15 +178,18 @@ public:
         }
         else
             val = NDS::ARM7Read16(addr);
-
-        Cycles += Waitstates[2][(addr>>24)&0xF];
         return val;
     }
 
     u32 DataRead32(u32 addr, u32 forceuser=0)
     {
-        u32 val;
         addr &= ~3;
+        Cycles += Waitstates[3][(addr>>24)&0xF];
+
+        if (Num && ((addr & 0xFF000000) == 0x02000000))
+            return *(u32*)&NDS::MainRAM[addr & (MAIN_RAM_SIZE - 1)];
+
+        u32 val;
         if (!Num)
         {
             if (!CP15::HandleDataRead32(addr, &val, forceuser))
@@ -184,13 +197,19 @@ public:
         }
         else
             val = NDS::ARM7Read32(addr);
-
-        Cycles += Waitstates[3][(addr>>24)&0xF];
         return val;
     }
 
     void DataWrite8(u32 addr, u8 val, u32 forceuser=0)
     {
+        Cycles += Waitstates[2][(addr>>24)&0xF];
+
+        if (Num && ((addr & 0xFF000000) == 0x02000000))
+        {
+            NDS::MainRAM[addr & (MAIN_RAM_SIZE - 1)] = val;
+            return;
+        }
+
         if (!Num)
         {
             if (!CP15::HandleDataWrite8(addr, val, forceuser))
@@ -198,13 +217,19 @@ public:
         }
         else
             NDS::ARM7Write8(addr, val);
-
-        Cycles += Waitstates[2][(addr>>24)&0xF];
     }
 
     void DataWrite16(u32 addr, u16 val, u32 forceuser=0)
     {
         addr &= ~1;
+        Cycles += Waitstates[2][(addr>>24)&0xF];
+
+        if (Num && ((addr & 0xFF000000) == 0x02000000))
+        {
+            *(u16*)&NDS::MainRAM[addr & (MAIN_RAM_SIZE - 1)] = val;
+            return;
+        }
+
         if (!Num)
         {
             if (!CP15::HandleDataWrite16(addr, val, forceuser))
@@ -212,13 +237,19 @@ public:
         }
         else
             NDS::ARM7Write16(addr, val);
-
-        Cycles += Waitstates[2][(addr>>24)&0xF];
     }
 
     void DataWrite32(u32 addr, u32 val, u32 forceuser=0)
     {
         addr &= ~3;
+        Cycles += Waitstates[3][(addr>>24)&0xF];
+
+        if (Num && ((addr & 0xFF000000) == 0x02000000))
+        {
+            *(u32*)&NDS::MainRAM[addr & (MAIN_RAM_SIZE - 1)] = val;
+            return;
+        }
+
         if (!Num)
         {
             if (!CP15::HandleDataWrite32(addr, val, forceuser))
@@ -226,10 +257,7 @@ public:
         }
         else
             NDS::ARM7Write32(addr, val);
-
-        Cycles += Waitstates[3][(addr>>24)&0xF];
     }
-
 
     u32 Num;
 
