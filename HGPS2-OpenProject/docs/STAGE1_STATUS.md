@@ -14,7 +14,7 @@ Legend: **PASS** = verified by build/test; **READY** = implemented and compiled 
 | Native overlay lifecycle | **READY** | `init -> exec -> exit` manager implemented without DS ITCM/DTCM placement. |
 | Private hybrid ISO assembly | **PASS (structure)** | ISO9660/Joliet image assembled from the freshly compiled hybrid ELF and byte-checked against the user-supplied ROM/BIOS inputs. Runtime test still pending. |
 | Hybrid bridge current-source build | **PASS** | the current branch now compiles successfully with the official PS2DEV toolchain. |
-| First genuine HeartGold frame on PS2 | **BLOCKED on runtime test** | no genuine game frame has been confirmed yet. |
+| First genuine HeartGold frame on PS2 | **WIP: first-frame probe** | ROM/BIOS resolution and cartridge loading now reach the transition into the frame loop; isolated RunFrame/render probe is ready for AetherSX2 test. |
 | Stable game-frame loop | **WIP** | depends on first genuine frame. |
 | Minimum game input | **WIP** | native pad layer exists; game integration depends on frame/boot path. |
 | Minimum audio | **WIP** | native HGPS2 audio remains optional/stubbed for first visual milestone. |
@@ -96,3 +96,22 @@ Interpretation:
 - red screen + white rectangle = ISO loader, ELF startup, DMA and GS are proven;
 - black screen = failure occurs before or during minimal ELF/GS startup and is unrelated to HeartGold;
 - sanity passes but hybrid stays black = continue debugging the hybrid initialization path.
+
+
+## AetherSX2 hybrid observation: cyan -> black
+
+The private pre-main-fix build progressed through all early boot colors. The captured final diagnostic color before black was verified as the Stage 7 cyan value (`RGB 0,96,96`).
+
+In that build, Stage 7 cyan is displayed immediately before `NDS::Init()`. The transition to black only occurs after `NDS::LoadROM()` reports success. This narrows the failure from general boot/ROM loading to the first emulation/render loop.
+
+A new first-frame probe was committed in `src/ps2/main.cpp`:
+
+- cyan — ROM/BIOS paths resolved, about to initialize NDS;
+- lime — cartridge loaded successfully;
+- gray — `SetScreenLayout()` returned;
+- pink — GS texture wrapper for `GPU::Framebuffer` allocated/configured;
+- navy — immediately before the first isolated `NDS::RunFrame()`;
+- gold — the first `NDS::RunFrame()` returned;
+- game framebuffer with a white/green corner heartbeat — draw/flip works and frames continue advancing.
+
+The probe intentionally executes one NDS frame before pad polling, savestates or semaphore synchronization so those systems cannot hide the first-frame result.
