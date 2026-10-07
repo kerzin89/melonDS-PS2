@@ -32,7 +32,7 @@ jobs:
           cp HGBOOT.ELF stage/HGBOOT.ELF
           cp SYSTEM.CNF stage/SYSTEM.CNF
           xorriso -as mkisofs             -o HGPS2-SANITY.iso             -V HGPS2SANITY             -iso-level 1             -full-iso9660-filenames             stage
-          xorriso -indev HGPS2-SANITY.iso -find / -print
+          xorriso -indev HGPS2-SANITY.iso -ls /
       - uses: actions/upload-artifact@v4
         with:
           name: HGPS2-sanity-iso
