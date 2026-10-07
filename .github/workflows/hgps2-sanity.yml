@@ -1,0 +1,42 @@
+name: HGPS2 Sanity ISO
+
+on:
+  push:
+    branches: [hg-boot2]
+    paths:
+      - 'hgps2/sanity/**'
+      - '.github/workflows/hgps2-sanity.yml'
+  workflow_dispatch:
+
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    container: ghcr.io/ps2dev/ps2dev:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install host tools
+        run: apk add --no-cache make xorriso file
+      - name: Build minimal PS2 ELF
+        working-directory: hgps2/sanity
+        run: make clean all
+      - name: Inspect ELF
+        working-directory: hgps2/sanity
+        run: |
+          file HGBOOT.ELF
+          mips64r5900el-ps2-elf-readelf -h HGBOOT.ELF
+      - name: Build ISO from scratch
+        working-directory: hgps2/sanity
+        run: |
+          rm -rf stage
+          mkdir stage
+          cp HGBOOT.ELF stage/HGBOOT.ELF
+          cp SYSTEM.CNF stage/SYSTEM.CNF
+          xorriso -as mkisofs             -o HGPS2-SANITY.iso             -V HGPS2SANITY             -iso-level 1             -full-iso9660-filenames             stage
+          xorriso -indev HGPS2-SANITY.iso -find / -print
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HGPS2-sanity-iso
+          path: |
+            hgps2/sanity/HGPS2-SANITY.iso
+            hgps2/sanity/HGBOOT.ELF
+            hgps2/sanity/SYSTEM.CNF
