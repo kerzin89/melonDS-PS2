@@ -105,6 +105,12 @@ static const u64 STAGE_GREEN_RGBAQ   = GS_SETREG_RGBAQ(0x00,0x70,0x20,0x80,0x00)
 static const u64 STAGE_PURPLE_RGBAQ  = GS_SETREG_RGBAQ(0x50,0x00,0x70,0x80,0x00);
 static const u64 STAGE_CYAN_RGBAQ    = GS_SETREG_RGBAQ(0x00,0x60,0x60,0x80,0x00);
 static const u64 STAGE_MAGENTA_RGBAQ = GS_SETREG_RGBAQ(0x70,0x00,0x50,0x80,0x00);
+static const u64 STAGE_WHITE_RGBAQ   = GS_SETREG_RGBAQ(0xC0,0xC0,0xC0,0x80,0x00);
+static const u64 STAGE_LIME_RGBAQ    = GS_SETREG_RGBAQ(0x20,0xC0,0x20,0x80,0x00);
+static const u64 STAGE_GRAY_RGBAQ    = GS_SETREG_RGBAQ(0x48,0x48,0x48,0x80,0x00);
+static const u64 STAGE_PINK_RGBAQ    = GS_SETREG_RGBAQ(0xC0,0x20,0x80,0x80,0x00);
+static const u64 STAGE_NAVY_RGBAQ    = GS_SETREG_RGBAQ(0x00,0x00,0x90,0x80,0x00);
+static const u64 STAGE_GOLD_RGBAQ    = GS_SETREG_RGBAQ(0xC0,0x90,0x00,0x80,0x00);
 
 GSGLOBAL *gsGlobal = NULL;
 GSFONTM *font = NULL;
@@ -116,12 +122,12 @@ struct padButtonStatus padbuttons;
 uint32_t pad = 0;
 uint32_t oldpad = 0;
 
-int _newlib_heap_size_user = 330 * 1024 * 1024;
+int _newlib_heap_size_user = 20 * 1024 * 1024;
 int screen_x[2], screen_y[2];
 float screen_scale;
 void (*drawFunc)();
 
-vector<const char*> OptionDisplay =
+static const char *OptionDisplay[] =
 {
     "Boot game directly",
     "Threaded 3D renderer",
@@ -129,7 +135,7 @@ vector<const char*> OptionDisplay =
     "Screen layout"
 };
 
-vector<vector<const char*>> OptionValuesDisplay =
+static const char *OptionValuesDisplay[][2] =
 {
     { "Off", "On " },
     { "Off", "On " },
@@ -137,13 +143,16 @@ vector<vector<const char*>> OptionValuesDisplay =
     { "Standard", "Side by Side" }
 };
 
-vector<int*> OptionValues =
+static int *OptionValues[] =
 {
     &Config::DirectBoot,
     &Config::Threaded3D,
     &Config::SavestateRelocSRAM,
     &Config::ScreenLayout
 };
+
+static const unsigned int OptionCount =
+    sizeof(OptionDisplay) / sizeof(OptionDisplay[0]);
 
 u8 *BufferData[2];
 uint8_t AudioIdx = 0;
@@ -490,14 +499,14 @@ string Menu()
                 if (checkPressed(PAD_CROSS))
                 {
                     (*OptionValues[selection])++;
-                    if (*OptionValues[selection] >= (int)OptionValuesDisplay[selection].size())
+                    if (*OptionValues[selection] >= 2)
                         *OptionValues[selection] = 0;
                 }
                 else if (checkPressed(PAD_UP) && selection > 0)
                 {
                     selection--;
                 }
-                else if (checkPressed(PAD_DOWN) && selection < OptionDisplay.size() - 1)
+                else if (checkPressed(PAD_DOWN) && selection < OptionCount - 1)
                 {
                     selection++;
                 }
@@ -508,7 +517,7 @@ string Menu()
                     break;
                 }
 
-                for (unsigned int i = 0; i < OptionDisplay.size(); i++)
+                for (unsigned int i = 0; i < OptionCount; i++)
                 {
                     if (i == selection)
                     {
@@ -943,19 +952,25 @@ int main(int argc, char **argv){
         }
     }
 
-    printf("[HG2] cartridge loaded; entering emulation loop\n");
-    showBootStage(BLACK_RGBAQ);
+    printf("[HG2] cartridge loaded; entering first-frame probe\n");
+    showBootStage(STAGE_LIME_RGBAQ);
+    printf("[HG-FRAME] stage 8: cartridge loaded\n");
 
     //sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
 
     SetScreenLayout();
+    showBootStage(STAGE_GRAY_RGBAQ);
+    printf("[HG-FRAME] stage 9: screen layout ready\n");
 
-    // HG-BOOT2: the old port allocated two 64 KiB thread stacks and two
-    // audio buffers even though both StartThread() calls were disabled.
-    // Keep the diagnostic build single-threaded and reclaim that EE RAM.
+    // HG-BOOT2: keep this path single-threaded while the first frame is isolated.
     printf("[HG2] low-memory single-thread execution enabled\n");
 
     vram_buffer = (GSTEXTURE*)malloc(sizeof(GSTEXTURE));
+    if (!vram_buffer) {
+        printf("[HG-FRAME] ERROR: GSTEXTURE allocation failed\n");
+        showBootStage(STAGE_MAGENTA_RGBAQ);
+        for (;;) nopdelay();
+    }
 
     vram_buffer->Width = 256;
     vram_buffer->Height = 384;
@@ -963,8 +978,32 @@ int main(int argc, char **argv){
     vram_buffer->Filter = GS_FILTER_NEAREST;
     vram_buffer->Mem = GPU::Framebuffer;
 
+    showBootStage(STAGE_PINK_RGBAQ);
+    printf("[HG-FRAME] stage 10: framebuffer texture ready\n");
+
+    /*
+     * First real HeartGold frame probe. Do not involve pad polling, savestates
+     * or the semaphore yet; none of them are required to prove that the NDS
+     * core can advance one frame.
+     */
+    showBootStage(STAGE_NAVY_RGBAQ);
+    printf("[HG-FRAME] stage 11: entering NDS::RunFrame()\n");
+    NDS::RunFrame();
+
+    showBootStage(STAGE_GOLD_RGBAQ);
+    printf("[HG-FRAME] stage 12: NDS::RunFrame() returned\n");
+
+    gsKit_TexManager_invalidate(gsGlobal, vram_buffer);
+    gsKit_clear(gsGlobal, BLACK_RGBAQ);
+    drawFunc();
+    gsKit_prim_sprite(gsGlobal, 8.0f, 8.0f, 40.0f, 40.0f, 1,
+                      GS_SETREG_RGBAQ(0xFF,0xFF,0xFF,0x80,0x00));
+    flipScreen();
+    printf("[HG-FRAME] stage 13: first framebuffer submitted to GS\n");
+
     uint32_t keys[] = { PAD_CROSS, PAD_CIRCLE, PAD_SELECT, PAD_START, PAD_RIGHT, PAD_LEFT, PAD_UP, PAD_DOWN, PAD_R1, PAD_L1, PAD_SQUARE, PAD_TRIANGLE };
     bool Touching = false;
+    unsigned int hgFrameCounter = 1;
     
     while (true)
     {
@@ -1036,12 +1075,19 @@ int main(int argc, char **argv){
         NDS::ReleaseKey(16 + 6);
         NDS::ReleaseScreen();
 
-        WaitSema(EmuSema);
         NDS::RunFrame();
-        SignalSema(EmuSema);
+        ++hgFrameCounter;
         gsKit_TexManager_invalidate(gsGlobal, vram_buffer);
-        gsKit_clear(gsGlobal, 0x80000000);	
+        gsKit_clear(gsGlobal, 0x80000000);
         drawFunc();
+
+        /* White/green heartbeat proves that frames continue even while the
+         * emulated game itself is intentionally outputting black. */
+        gsKit_prim_sprite(
+            gsGlobal, 8.0f, 8.0f, 40.0f, 40.0f, 1,
+            (hgFrameCounter & 32)
+                ? GS_SETREG_RGBAQ(0xFF,0xFF,0xFF,0x80,0x00)
+                : GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00));
         flipScreen();
         
         oldpad = pad;
