@@ -586,9 +586,9 @@ int AdvFrame(unsigned int argc, void *args)
 
         //WaitSema(EmuSema);
         NDS::RunFrame();
-        printf("RunTestz\n");
         //SignalSema(EmuSema);
-        memcpy(vram_buffer->Mem, GPU::Framebuffer, 256 * 384 * 4);
+        // vram_buffer->Mem points directly at GPU::Framebuffer; copying it to
+        // itself wastes ~384 KiB every frame.
         gsKit_TexManager_invalidate(gsGlobal, vram_buffer);
         gsKit_TexManager_bind(gsGlobal, vram_buffer);
         
@@ -814,7 +814,9 @@ int main(int argc, char **argv){
         }
     }
 
+    printf("[HG2] initializing NDS core\n");
     NDS::Init();
+    printf("[HG2] loading cartridge\n");
     if (!NDS::LoadROM(rompath.c_str(), srampath.c_str(), Config::DirectBoot))
     {
         while (true){
@@ -824,32 +826,16 @@ int main(int argc, char **argv){
         }
     }
 
+    printf("[HG2] cartridge loaded; entering emulation loop\n");
+
     //sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
 
     SetScreenLayout();
 
-    ee_thread_t thread_main;
-	
-	thread_main.gp_reg = &_gp;
-    thread_main.func = (void*)AdvFrame;
-    thread_main.stack = malloc(0x10000);
-    thread_main.stack_size = 0x10000;
-    thread_main.initial_priority = 0x40;
-	int main = CreateThread(&thread_main);
-    //StartThread(main, NULL);
-
-    ee_thread_t thread_audio;
-	
-	thread_audio.gp_reg = &_gp;
-    thread_audio.func = (void*)PlayAudio;
-    thread_audio.stack = malloc(0x10000);
-    thread_audio.stack_size = 0x10000;
-    thread_audio.initial_priority = 0x40;
-	int audio_thd = CreateThread(&thread_audio);
-    //StartThread(audio_thd, NULL);
-
-    BufferData[0] = (u8*)malloc(4096);
-    BufferData[1] = (u8*)malloc(4096);
+    // HG-BOOT2: the old port allocated two 64 KiB thread stacks and two
+    // audio buffers even though both StartThread() calls were disabled.
+    // Keep the diagnostic build single-threaded and reclaim that EE RAM.
+    printf("[HG2] low-memory single-thread execution enabled\n");
 
     vram_buffer = (GSTEXTURE*)malloc(sizeof(GSTEXTURE));
 
