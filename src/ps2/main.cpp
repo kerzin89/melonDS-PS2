@@ -717,6 +717,21 @@ int PlayAudio(unsigned int argc, void *argv)
     return 0;
 }
 
+static unsigned int framebuffer_nonwhite_samples()
+{
+    unsigned int changed = 0;
+    const unsigned int total = 256 * 192 * 2;
+
+    /* Sample instead of scanning every pixel; this is only a cheap Stage 1
+     * progress signal and must not become a permanent hot-path cost. */
+    for (unsigned int i = 0; i < total; i += 257) {
+        const u32 px = GPU::Framebuffer[i];
+        if (px != 0xFFFFFFFF && px != 0xFF3F3F3F && px != 0x00000000)
+            ++changed;
+    }
+    return changed;
+}
+
 static void showBootStage(u64 color)
 {
     if (!gsGlobal)
@@ -1021,10 +1036,54 @@ int main(int argc, char **argv){
     flipScreen();
     printf("[HG-FRAME] stage 15: first framebuffer submitted to GS\n");
 
+    /*
+     * Autonomous progression probe:
+     * prove that HeartGold can advance many frames before reintroducing pad,
+     * savestate and audio-side work. The top-left marker changes color every
+     * 16 frames. A lower marker turns green once sampled framebuffer data is
+     * no longer just reset/blank white/black values.
+     */
+    unsigned int hgFrameCounter = 1;
+    unsigned int everNonBlank = framebuffer_nonwhite_samples();
+
+    while (hgFrameCounter < 300) {
+        NDS::RunFrame();
+        ++hgFrameCounter;
+
+        unsigned int nonBlank = framebuffer_nonwhite_samples();
+        if (nonBlank)
+            everNonBlank += nonBlank;
+
+        gsKit_TexManager_invalidate(gsGlobal, vram_buffer);
+        gsKit_clear(gsGlobal, 0x80000000);
+        drawFunc();
+
+        u64 heartbeat;
+        switch ((hgFrameCounter >> 4) & 3) {
+        case 0: heartbeat = GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00); break;
+        case 1: heartbeat = GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00); break;
+        case 2: heartbeat = GS_SETREG_RGBAQ(0x00,0x40,0xFF,0x80,0x00); break;
+        default: heartbeat = GS_SETREG_RGBAQ(0xFF,0xFF,0xFF,0x80,0x00); break;
+        }
+
+        gsKit_prim_sprite(gsGlobal, 8.0f, 8.0f, 40.0f, 40.0f, 1, heartbeat);
+        gsKit_prim_sprite(
+            gsGlobal, 8.0f, 48.0f, 40.0f, 80.0f, 1,
+            everNonBlank
+                ? GS_SETREG_RGBAQ(0x00,0xFF,0x00,0x80,0x00)
+                : GS_SETREG_RGBAQ(0xFF,0x00,0x00,0x80,0x00));
+        flipScreen();
+
+        if ((hgFrameCounter % 30) == 0)
+            printf("[HG-FRAME] autonomous frame=%u nonblank=%u ever=%u\n",
+                   hgFrameCounter, nonBlank, everNonBlank);
+    }
+
+    printf("[HG-FRAME] autonomous 300-frame probe complete; entering interactive loop\n");
+
     uint32_t keys[] = { PAD_CROSS, PAD_CIRCLE, PAD_SELECT, PAD_START, PAD_RIGHT, PAD_LEFT, PAD_UP, PAD_DOWN, PAD_R1, PAD_L1, PAD_SQUARE, PAD_TRIANGLE };
     bool Touching = false;
-    unsigned int hgFrameCounter = 1;
-    
+
     while (true)
     {
 
