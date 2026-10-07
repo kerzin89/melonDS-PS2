@@ -80,7 +80,7 @@ Help is welcome in R5900/PS2SDK bring-up, GS rendering, pad mapping, SPU2 audio,
 
 Do not submit commercial ROMs, BIOS files, Nintendo SDK binaries, extracted copyrighted assets, or other proprietary files.
 
-See `docs/ARCHITECTURE.md`, `docs/PROGRESS.md`, `docs/ROM_POLICY.md`, and `CONTRIBUTING.md`.
+See `docs/STAGES.md`, `docs/STAGE1_STATUS.md`, `docs/ARCHITECTURE.md`, `docs/PROGRESS.md`, `docs/ROM_POLICY.md`, and `CONTRIBUTING.md`.
 
 ## License
 
