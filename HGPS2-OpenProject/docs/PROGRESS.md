@@ -54,3 +54,18 @@ The P0.1 ELF/ISO boots, displays the diagnostic screen, visibly animates for at 
 ### Next
 
 Add native pad input and a minimal HeartGold startup compatibility state machine, then begin mapping the reconstructed `NitroMain()` dependencies.
+
+
+## P0.2 - Hybrid real-frame bridge
+
+A temporary compatibility route now exists for reaching real HeartGold frames before the native port is complete.
+
+The legacy PS2 melonDS frontend probes the boot disc for `HEARTGOLD.NDS` through `cdrom0:` / `cdfs:` paths before opening the USB browser. If the embedded user-owned dump is accessible, the existing core proceeds through `NDS::LoadROM()`, `NDS::RunFrame()`, and uploads `GPU::Framebuffer` to the PS2 GS.
+
+This is a transitional diagnostic path, **not the final architecture**. It lets us answer an important question early: can the PS2 build advance this specific game far enough to produce genuine game frames?
+
+A private ISO builder is provided at `tools/make_hybrid_iso.sh`. It requires the user to supply their own HeartGold dump, DS BIOS/firmware and compiled PS2 ELF. Those proprietary inputs are never committed.
+
+Current unverified risk: CD/DVD filesystem initialization and newlib path behavior on real hardware/PCSX2. The code probes both `cdrom0:` and `cdfs:` spellings and logs each attempt. PS2SDK provides CD/DVD access, but this stage must be tested rather than assumed successful.
+
+If the hybrid route reaches game frames, it becomes a behavioral oracle while HGPS2 replaces emulator services one subsystem at a time.
