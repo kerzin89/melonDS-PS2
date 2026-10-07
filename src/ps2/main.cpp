@@ -400,6 +400,32 @@ void flipScreen()
 }
 
 
+
+static bool fileExists(const char *path)
+{
+    struct stat st;
+    return stat(path, &st) == 0 && !S_ISDIR(st.st_mode);
+}
+
+static string FindIsoHeartGold()
+{
+    const char *candidates[] = {
+        "cdrom0:\\HEARTGOLD.NDS;1",
+        "cdrom0:\\HEARTGOLD.NDS",
+        "cdfs:\\HEARTGOLD.NDS;1",
+        "cdfs:\\HEARTGOLD.NDS"
+    };
+    for (unsigned int i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
+        printf("[HG-ISO] probing %s\n", candidates[i]);
+        if (fileExists(candidates[i])) {
+            printf("[HG-ISO] found HeartGold on disc: %s\n", candidates[i]);
+            return string(candidates[i]);
+        }
+    }
+    printf("[HG-ISO] no embedded HeartGold ROM found; falling back to browser\n");
+    return string();
+}
+
 string Menu()
 {
 	char path[256];
