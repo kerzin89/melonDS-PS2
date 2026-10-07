@@ -14,7 +14,7 @@ Legend: **PASS** = verified by build/test; **READY** = implemented and compiled 
 | Native overlay lifecycle | **READY** | `init -> exec -> exit` manager implemented without DS ITCM/DTCM placement. |
 | Private hybrid ISO assembly | **PASS (structure)** | ISO9660/Joliet image assembled from the freshly compiled hybrid ELF and byte-checked against the user-supplied ROM/BIOS inputs. Runtime test still pending. |
 | Hybrid bridge current-source build | **PASS** | the current branch now compiles successfully with the official PS2DEV toolchain. |
-| First genuine HeartGold frame on PS2 | **WIP: first-frame probe** | ROM/BIOS resolution and cartridge loading now reach the transition into the frame loop; isolated RunFrame/render probe is ready for AetherSX2 test. |
+| First genuine HeartGold frame on PS2 | **CORE FRAME PASS / PRESENTATION WIP** | AetherSX2 reached gold after the first isolated `NDS::RunFrame()` returned. Rendering the produced framebuffer to GS is the current blocker. |
 | Stable game-frame loop | **WIP** | depends on first genuine frame. |
 | Minimum game input | **WIP** | native pad layer exists; game integration depends on frame/boot path. |
 | Minimum audio | **WIP** | native HGPS2 audio remains optional/stubbed for first visual milestone. |
@@ -115,3 +115,14 @@ A new first-frame probe was committed in `src/ps2/main.cpp`:
 - game framebuffer with a white/green corner heartbeat — draw/flip works and frames continue advancing.
 
 The probe intentionally executes one NDS frame before pad polling, savestates or semaphore synchronization so those systems cannot hide the first-frame result.
+
+
+## Gold first-frame result — PASS
+
+AetherSX2 reached the gold Stage 12 diagnostic color. This color is displayed only after the first isolated `NDS::RunFrame()` returns.
+
+This confirms that the emulator core can advance at least one real HeartGold frame. The remaining failure is in the PS2 presentation path after frame execution.
+
+The renderer inspection found a concrete bug: `GSTEXTURE` was allocated with `malloc()` and only a subset of fields was initialized. Fields such as `Clut`, `Vram`, `VramClut`, `TBW`, `Delayed` and CLUT metadata could contain garbage. `gsKit_TexManager_bind()` checks and uses these fields, so garbage state can cause an invalid palette/cache/VRAM path exactly after the first frame.
+
+The texture is now zero-initialized with `calloc()`, all critical fields are set explicitly, and framebuffer upload is diagnosed separately from sprite submission.
