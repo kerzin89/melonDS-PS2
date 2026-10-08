@@ -48,7 +48,7 @@ int  hgps2_pad_init(void);
 void hgps2_pad_shutdown(void);
 int  hgps2_pad_poll(HgPs2PadState *state);
 
-int hgps2_file_read_all(const char *path, void **data, size_t *size);
+/* Read only a bounded region of a file, without allocating the whole file.\n * Returns 1 only when exactly 'size' bytes were read.\n * 'offset' is limited to LONG_MAX by the current stdio backend. */\nint hgps2_file_read_range(const char *path, size_t offset, void *buffer, size_t size);\nint hgps2_file_read_all(const char *path, void **data, size_t *size);
 int hgps2_file_write_all(const char *path, const void *data, size_t size);
 
 int  hgps2_video_init(int width, int height);
