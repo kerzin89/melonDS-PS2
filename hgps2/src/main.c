@@ -1,5 +1,6 @@
 #include "hgps2/compat.h"
 #include "hgps2/overlay.h"
+#include "hgps2/nitrofs.h"
 #include "hgps2/system_compat.h"
 
 static int diagnostic_init(HgPs2OverlayManager *manager, int *state)
@@ -39,8 +40,16 @@ int main(int argc, char **argv)
     hg_u32 last_report = 0;
     int pad_ok;
 
-    (void)argc;
-    (void)argv;
+    /* Optional ROM path: inspect NitroFS metadata only; never load the ROM
+     * into EE RAM or execute Nintendo DS code in this native diagnostic. */
+    if (argc > 1 && argv[1]) {
+        HgPs2NitroFs fs;
+        if (hgps2_nitrofs_open(&fs, argv[1]))
+            hgps2_log("[HGPS2][NITROFS] files=%u ROM bytes=%u\n",
+                      (unsigned)fs.file_count, (unsigned)fs.rom_size);
+        else
+            hgps2_log("[HGPS2][NITROFS] ROM metadata unavailable\n");
+    }
 
     if (!hgps2_init())
         return 1;
