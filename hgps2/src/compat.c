@@ -67,17 +67,14 @@ int hgps2_init(void)
     StartTimerSystemTime();
 #endif
     s_boot_ticks = hgps2_ticks();
-    hgps2_log("[HGPS2] compatibility runtime init
-");
-    hgps2_log("[HGPS2] target=R5900 stage=1 functionality
-");
+    hgps2_log("[HGPS2] compatibility runtime init\n");
+    hgps2_log("[HGPS2] target=R5900 stage=1 functionality\n");
     return 1;
 }
 
 void hgps2_shutdown(void)
 {
-    hgps2_log("[HGPS2] shutdown ticks=%llu
-",
+    hgps2_log("[HGPS2] shutdown ticks=%llu\n",
               (unsigned long long)(hgps2_ticks() - s_boot_ticks));
 }
 
@@ -87,7 +84,6 @@ int hgps2_file_read_range(const char *path, size_t offset, void *buffer, size_t 
     size_t got;
 
     if (!path || (!buffer && size != 0)) return 0;
-    /* fseek takes a signed long; reject offsets that cannot be represented. */
     if (offset > (size_t)LONG_MAX) return 0;
     f = fopen(path, "rb");
     if (!f) return 0;
