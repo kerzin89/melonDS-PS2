@@ -56,3 +56,14 @@ Never mark a change tested merely because it compiled. Never claim an ISO/ELF ex
 **Action:** added this continuity log to prevent losing prior decisions and repeating already documented diagnostics.
 **Build/runtime:** not executed in this session.
 **Next:** inspect native runtime source and CI, then implement/test the next native milestone; log evidence here.
+
+## Session entry — 2026-10-08: native bounded file reads
+
+**Track:** native HGPS2 only (`hgps2/`).
+**Baseline:** `hg-boot2`; prior native build success recorded by GitHub Actions at commit `6e001a1981682e31981d24c0a5397b381f1cf8c2`. This is an earlier build, not validation of the changes below.
+**Goal:** avoid loading entire large game-data files into 32 MiB EE RAM.
+**Files changed:** `hgps2/include/hgps2/compat.h`, `hgps2/src/compat.c`.
+**Changes:** new `hgps2_file_read_range(path, offset, buffer, size)` API using seek + exact-length read, with null-pointer and signed-long offset checks. Caller owns the bounded buffer; no full-file allocation. Existing `hgps2_file_read_all` remains unchanged for smaller files.
+**Commits:** `eb315086337322113a41c3f266b33b76cc56f3f7` (declaration), `78d3bff6ecd20c5398b7ddf177f612e947de0c2e` (implementation).
+**Build/runtime:** NOT YET VERIFIED for these commits. GitHub Actions should be checked after the push. No PS2 runtime test or game-data integration has been performed.
+**Next step:** verify CI, add host-side boundary tests (zero-length, short-read, out-of-range, valid offsets), then use this API in a game asset loader with a strict memory budget. Do not confuse streaming with virtual RAM or claim that game assets are ported.
