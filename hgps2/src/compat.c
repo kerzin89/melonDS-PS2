@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <time.h>\n#include <limits.h>
+#include <time.h>
+#include <limits.h>
 
 #ifdef __PS2__
 #include <kernel.h>
@@ -66,18 +67,40 @@ int hgps2_init(void)
     StartTimerSystemTime();
 #endif
     s_boot_ticks = hgps2_ticks();
-    hgps2_log("[HGPS2] compatibility runtime init\n");
-    hgps2_log("[HGPS2] target=R5900 stage=1 functionality\n");
+    hgps2_log("[HGPS2] compatibility runtime init
+");
+    hgps2_log("[HGPS2] target=R5900 stage=1 functionality
+");
     return 1;
 }
 
 void hgps2_shutdown(void)
 {
-    hgps2_log("[HGPS2] shutdown ticks=%llu\n",
+    hgps2_log("[HGPS2] shutdown ticks=%llu
+",
               (unsigned long long)(hgps2_ticks() - s_boot_ticks));
 }
 
-int hgps2_file_read_range(const char *path, size_t offset, void *buffer, size_t size)\n{\n    FILE *f;\n    size_t got;\n\n    if (!path || (!buffer && size != 0)) return 0;\n    /* fseek takes a signed long; reject offsets that cannot be represented. */\n    if (offset > (size_t)LONG_MAX) return 0;\n    f = fopen(path, "rb");\n    if (!f) return 0;\n    if (fseek(f, (long)offset, SEEK_SET) != 0) {\n        fclose(f);\n        return 0;\n    }\n    got = size ? fread(buffer, 1, size, f) : 0;\n    fclose(f);\n    return got == size;\n}\n\nint hgps2_file_read_all(const char *path, void **data, size_t *size)
+int hgps2_file_read_range(const char *path, size_t offset, void *buffer, size_t size)
+{
+    FILE *f;
+    size_t got;
+
+    if (!path || (!buffer && size != 0)) return 0;
+    /* fseek takes a signed long; reject offsets that cannot be represented. */
+    if (offset > (size_t)LONG_MAX) return 0;
+    f = fopen(path, "rb");
+    if (!f) return 0;
+    if (fseek(f, (long)offset, SEEK_SET) != 0) {
+        fclose(f);
+        return 0;
+    }
+    got = size ? fread(buffer, 1, size, f) : 0;
+    fclose(f);
+    return got == size;
+}
+
+int hgps2_file_read_all(const char *path, void **data, size_t *size)
 {
     FILE *f;
     long n;
