@@ -67,3 +67,12 @@ Never mark a change tested merely because it compiled. Never claim an ISO/ELF ex
 **Commits:** `eb315086337322113a41c3f266b33b76cc56f3f7` (declaration), `78d3bff6ecd20c5398b7ddf177f612e947de0c2e` (implementation).
 **Build/runtime:** NOT YET VERIFIED for these commits. GitHub Actions should be checked after the push. No PS2 runtime test or game-data integration has been performed.
 **Next step:** verify CI, add host-side boundary tests (zero-length, short-read, out-of-range, valid offsets), then use this API in a game asset loader with a strict memory budget. Do not confuse streaming with virtual RAM or claim that game assets are ported.
+
+## Session entry — 2026-10-08: CI failure diagnosis and regression tests
+
+**Track:** native.
+**Finding:** CI run `37781896476` failed in `native-runtime` while `hybrid-bridge` passed. The native job log identifies literal backslash-n sequences in `hgps2/include/hgps2/compat.h` (stray '\\' and unknown type `nint`), introduced in the prior GitHub source edit.
+**Fix:** replaced malformed header lines; restored `hgps2/src/compat.c` from the previous valid revision and reinserted the bounded-read function using actual line breaks, preserving existing C string escapes. Corrected implementation commit: `c6c93eb2b3cd0d0793247fd3a5919ff09d09194b`.
+**Tests added:** `hgps2/tests/test_file_range.c` checks successful partial read, zero-length read, truncated read, null buffer, and missing file. Workflow `.github/workflows/hgps2.yml` now has a `host-file-tests` job. Commits: `a2480c2ede4fe2924646340922f524e54c120876` and `4a7117bda261ca19156eb2ca6845ee44afeaf3a2`.
+**Status:** fixes committed; final CI and runtime results pending. Earlier failed run must not be counted as PASS.
+**Next:** verify the latest GitHub Actions run and correct any compiler/test failure before integrating a resource loader.
