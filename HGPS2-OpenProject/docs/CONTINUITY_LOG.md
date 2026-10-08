@@ -76,3 +76,13 @@ Never mark a change tested merely because it compiled. Never claim an ISO/ELF ex
 **Tests added:** `hgps2/tests/test_file_range.c` checks successful partial read, zero-length read, truncated read, null buffer, and missing file. Workflow `.github/workflows/hgps2.yml` now has a `host-file-tests` job. Commits: `a2480c2ede4fe2924646340922f524e54c120876` and `4a7117bda261ca19156eb2ca6845ee44afeaf3a2`.
 **Status:** fixes committed; final CI and runtime results pending. Earlier failed run must not be counted as PASS.
 **Next:** verify the latest GitHub Actions run and correct any compiler/test failure before integrating a resource loader.
+
+## Session entry — 2026-10-08: bounded NitroFS file-ID loader
+
+**Track:** native HGPS2.
+**CI baseline:** run `37788569112` completed SUCCESS at commit `4a7117bda261ca19156eb2ca6845ee44afeaf3a2` (native ELF, hybrid ELF, host range-read tests). This success predates the NitroFS changes.
+**Changes:** added `hgps2/include/hgps2/nitrofs.h` and `hgps2/src/nitrofs.c`. The loader reads NDS header FAT offset/size at 0x48/0x4C, validates FAT bounds, reads one 8-byte FAT entry per request, and loads caller-specified subranges of file-ID resources directly from a user-provided ROM path. It does not allocate a full ROM or cache resources in EE RAM. Added optional ROM-path metadata probe in `hgps2/src/main.c`, added `src/nitrofs.o` to native Makefile, and synthetic-ROM host tests in `hgps2/tests/test_nitrofs.c` plus CI workflow.
+**Memory:** fixed stack metadata (80-byte header, 8-byte FAT entry) and caller-owned read buffer; no full-ROM allocation. Reading a resource still requires an external valid ROM path; PS2 optical path / CLI argument behavior needs runtime verification. This is a FAT file-ID primitive, **not** FNT filename resolution, NARC decompression, or game resource integration.
+**Security/rights:** test fixture is synthetic; no copyrighted game ROM, BIOS, or assets added.
+**Build/runtime:** NitroFS changes awaiting new CI confirmation; no gameplay or on-device test claimed.
+**Next:** confirm CI jobs, fix failures, then implement a bounded NARC member reader or game-facing resource API with explicit maximum buffer size.
