@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <time.h>
+#include <time.h>\n#include <limits.h>
 
 #ifdef __PS2__
 #include <kernel.h>
@@ -77,7 +77,7 @@ void hgps2_shutdown(void)
               (unsigned long long)(hgps2_ticks() - s_boot_ticks));
 }
 
-int hgps2_file_read_all(const char *path, void **data, size_t *size)
+int hgps2_file_read_range(const char *path, size_t offset, void *buffer, size_t size)\n{\n    FILE *f;\n    size_t got;\n\n    if (!path || (!buffer && size != 0)) return 0;\n    /* fseek takes a signed long; reject offsets that cannot be represented. */\n    if (offset > (size_t)LONG_MAX) return 0;\n    f = fopen(path, "rb");\n    if (!f) return 0;\n    if (fseek(f, (long)offset, SEEK_SET) != 0) {\n        fclose(f);\n        return 0;\n    }\n    got = size ? fread(buffer, 1, size, f) : 0;\n    fclose(f);\n    return got == size;\n}\n\nint hgps2_file_read_all(const char *path, void **data, size_t *size)
 {
     FILE *f;
     long n;
