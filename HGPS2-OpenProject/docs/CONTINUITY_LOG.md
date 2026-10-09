@@ -105,3 +105,12 @@ Never mark a change tested merely because it compiled. Never claim an ISO/ELF ex
 **Tests:** synthetic signature tests in `hgps2/tests/test_resource.c`; native Makefile and host CI updated.
 **Limitations:** identification is a header probe, not full validation, decompression, sprite/map parsing, texture upload, or proof of compatibility with actual HeartGold data. Many resources are compressed or headerless; these return unknown. No copyrighted ROM/assets included.
 **Next:** confirm latest CI and test with user-owned HeartGold input outside the repository. Implement LZ77/other required decompression with output-size caps only after identifying actual resource formats.
+
+## Session entry — 2026-10-08: bounded LZ10 decoder
+
+**Track:** native HGPS2.
+**CI baseline:** run `37862698556` at commit `ecdaecff37f5057fe1b4a11bfd33d38bda1f5338` completed SUCCESS (resource signature probe, NARC, NitroFS, native ELF).
+**Changes:** added `hgps2/include/hgps2/lz77.h`, `hgps2/src/lz77.c`, `hgps2/tests/test_lz77.c`; added decoder to native Makefile and CI. LZ10 0x10 decoder checks declared output length against caller buffer, validates source truncation, displacement and run boundaries, uses no heap, and reports bytes written.
+**Tests:** synthetic literal/backreference sequence and malformed streams. No real HeartGold resource data or ROM committed.
+**Limitations:** only LZ10, not LZ11, Huffman, RLE, custom graphics codecs, tiles/palette rendering, or full real-ROM validation. Decode API requires compressed input available in memory and separate output buffer; later streaming can bound compressed member size. Current CI result for this change pending.
+**Next:** check new workflow results, fix test/compiler errors, then add bounded tile/palette decoding and connect resource loading under an explicit working-set budget.
