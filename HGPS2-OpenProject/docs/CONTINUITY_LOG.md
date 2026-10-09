@@ -95,3 +95,13 @@ Never mark a change tested merely because it compiled. Never claim an ISO/ELF ex
 **Limitations:** no NARC decompression, BTNF name resolution, asset decoding, or game execution. Current parser requires a 16-byte header, little-endian BOM, version 0x0100, and exact archive length; real game compatibility must be tested against user-owned inputs. Current source tests use synthetic bytes only.
 **Build:** new NARC CI run pending at time of entry; do not mark it PASS before results.
 **Next:** inspect the latest CI logs, fix any errors, and validate archive layouts against locally supplied lawful game files without committing ROM/assets.
+
+## Session entry — 2026-10-08: Nitro resource signature inspection
+
+**Track:** native HGPS2.
+**NARC CI status at session start:** prior NARC workflow runs were still in progress; no result claimed.
+**Source context:** upstream `pret/pokeheartgold` contains game data and graphics directories (`files/graphic`, `files/fielddata`, `files/a`). Those paths are organizational context, not proof that real HeartGold assets were decoded.
+**Implementation:** added `hgps2/src/resource.c` and `hgps2/include/hgps2/resource.h` to identify common Nintendo DS graphics signatures (NCGR, NCLR, NSCR, NCER, NANR, NSBMD, NSBTX) and NARC. `hgps2_resource_probe_member` uses the bounded NARC member API to read only the first four bytes and report member size and likely format.
+**Tests:** synthetic signature tests in `hgps2/tests/test_resource.c`; native Makefile and host CI updated.
+**Limitations:** identification is a header probe, not full validation, decompression, sprite/map parsing, texture upload, or proof of compatibility with actual HeartGold data. Many resources are compressed or headerless; these return unknown. No copyrighted ROM/assets included.
+**Next:** confirm latest CI and test with user-owned HeartGold input outside the repository. Implement LZ77/other required decompression with output-size caps only after identifying actual resource formats.
