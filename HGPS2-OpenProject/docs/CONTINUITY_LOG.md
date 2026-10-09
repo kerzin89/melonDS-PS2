@@ -86,3 +86,12 @@ Never mark a change tested merely because it compiled. Never claim an ISO/ELF ex
 **Security/rights:** test fixture is synthetic; no copyrighted game ROM, BIOS, or assets added.
 **Build/runtime:** NitroFS changes awaiting new CI confirmation; no gameplay or on-device test claimed.
 **Next:** confirm CI jobs, fix failures, then implement a bounded NARC member reader or game-facing resource API with explicit maximum buffer size.
+
+## Session entry — 2026-10-08: NARC member reader
+
+**Track:** native HGPS2.
+**Verified baseline:** GitHub Actions run `37791226933` at `1bc932e9d8d25269ec9466a5eb3b31d38b310f78` completed SUCCESS, including the native ELF and synthetic NitroFS tests. No console runtime test.
+**Implementation:** `hgps2/include/hgps2/narc.h` and `hgps2/src/narc.c` parse a NARC header and BTAF/GMIF chunks, index file members, and read bounded subranges through the NitroFS reader without loading the archive. Synthetic NARC test: `hgps2/tests/test_narc.c`. Native Makefile and host CI updated.
+**Limitations:** no NARC decompression, BTNF name resolution, asset decoding, or game execution. Current parser requires a 16-byte header, little-endian BOM, version 0x0100, and exact archive length; real game compatibility must be tested against user-owned inputs. Current source tests use synthetic bytes only.
+**Build:** new NARC CI run pending at time of entry; do not mark it PASS before results.
+**Next:** inspect the latest CI logs, fix any errors, and validate archive layouts against locally supplied lawful game files without committing ROM/assets.
