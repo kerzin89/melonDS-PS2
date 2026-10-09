@@ -29,6 +29,10 @@ jobs:
         run: |
           cc -std=c11 -D_POSIX_C_SOURCE=200112L -Wall -Wextra -Werror -Ihgps2/include hgps2/src/compat.c hgps2/src/nitrofs.c hgps2/tests/test_nitrofs.c -o /tmp/hgps2-nitrofs-test
           /tmp/hgps2-nitrofs-test
+      - name: Test NARC archive member reads
+        run: |
+          cc -std=c11 -D_POSIX_C_SOURCE=200112L -Wall -Wextra -Werror -Ihgps2/include hgps2/src/compat.c hgps2/src/nitrofs.c hgps2/src/narc.c hgps2/tests/test_narc.c -o /tmp/hgps2-narc-test
+          /tmp/hgps2-narc-test
   native-runtime:
     runs-on: ubuntu-latest
     container: ghcr.io/ps2dev/ps2dev:latest
